@@ -1,0 +1,21 @@
+# Actuarial Theory and Practice A
+
+_"Tell me and I forget. Teach me and I remember. Involve me and I learn." – Benjamin Franklin_
+
+---
+
+### Congrats on completing the [2026 SOA Research Challenge](https://www.soa.org/research/opportunities/2026-student-research-case-study-challenge/)!
+
+
+> Now it's time to build your own website to showcase your work.  
+> Creating a website using GitHub Pages is simple and a great way to present your project.
+
+This page is written in Markdown.
+
+---
+
+> Be creative! You can embed or link your [data](player_data_salaries_2020.csv), [code](sample-data-clean.ipynb), and [images](ACC.png) here.
+
+More information on GitHub Pages can be found [here](https://pages.github.com/).
+
+![](Actuarial.gif)
