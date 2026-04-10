@@ -13,7 +13,7 @@ Other relevant files can be found in the following directories:
 
 As consulting actuaries representing Galaxy General Insurance Company (GGIC), team 4A1B presents a comprehensive and sustainable insurance portfolio for the Cosmic Quarry Mining Corporation (CQMC). With CQMC expanding its interstellar mining operations across Helionis Cluster, the Bayesia System, and the Oryn Delta, they are exposed to unique and volatile environmental hazards. This project focuses on pricing four major operational risks: Equipment Failure, Cargo Loss, Worker's Compensation, and Business Interruption.
 
-By building predictive models and running extensive Monte Carlo simulations, our goal is to deliver constructive, data-driven recommendations. This program is tailored to take account for the long-term solvenvy and profitability for GGIC, while protecting CQMC against catastrophic tail risks.
+By building predictive models and running extensive Monte Carlo simulations, our goal is to deliver constructive, data-driven recommendations. This program is tailored to take account for the long-term solvency and profitability for GGIC, while protecting CQMC against catastrophic tail risks.
 
 ---
 
