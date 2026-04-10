@@ -17,4 +17,91 @@ By building predictive models and running extensive Monte Carlo simulations, our
 
 ---
 
-# Data Cleaning & EDA
+# Data Cleaning, Data Limitations, Libraries and EDA
+
+# Product Design
+
+To address the operational risks faced by Cosmic Quarry Mining Corporation (CQMC), we propose a comprehensive suite of insurance products covering four key hazard areas:
+
+- Equipment Failure  
+- Cargo Loss  
+- Workers’ Compensation  
+- Business Interruption  
+
+Each product is designed to reflect the distinct risk characteristics across the Helionis Cluster, Bayesia System, and Oryn Delta, ensuring that pricing and coverage appropriately capture environmental differences.
+
+---
+
+## Coverage Structure
+
+| Product | Coverage |
+|--------|--------|
+| **Equipment Failure (EF)** | Covers repair and replacement costs of damaged mining equipment and infrastructure |
+| **Cargo Loss (CL)** | Covers loss or damage of minerals during transportation between operational sites |
+| **Workers’ Compensation (WC)** | Covers medical expenses, rehabilitation, and lost income from workplace injuries |
+| **Business Interruption (BI)** | Covers lost revenue and recovery costs from operational shutdowns |
+
+These products collectively provide full operational protection across CQMC’s mining lifecycle. :contentReference[oaicite:0]{index=0}
+
+---
+
+## Coverage Triggers
+
+Each policy is activated under clearly defined operational events:
+
+- **Equipment Failure:** Triggered by mechanical or system malfunction that disrupts mining operations  
+- **Cargo Loss:** Triggered when transported minerals are lost, damaged, or rendered unusable  
+- **Workers’ Compensation:** Triggered by work-related injury or illness preventing employees from operating  
+- **Business Interruption:** Triggered when a covered event results in full operational shutdown  
+
+---
+
+## Key Exclusions
+
+To control moral hazard and maintain pricing integrity, the following exclusions apply:
+
+- **Equipment Failure:** Wear and tear or inadequate maintenance  
+- **Cargo Loss:** Poor packaging or unauthorised transport routes  
+- **Workers’ Compensation:** Injuries due to misconduct or policy violations  
+- **Business Interruption:** Planned shutdowns or ongoing operational expenses  
+
+---
+
+## System-Based Risk Differentiation
+
+A core feature of the product design is differentiation across CQMC’s operating environments:
+
+- **Helionis Cluster:**  
+  Stable environment → lower overall risk, but exposure to asteroid-related equipment and transport incidents  
+
+- **Bayesia System:**  
+  High radiation and extreme conditions → increased equipment degradation and worker risk  
+
+- **Oryn Delta:**  
+  Low visibility and unstable asteroid fields → highest uncertainty, particularly for cargo transport and navigation  
+
+This differentiation ensures premiums reflect the underlying risk exposure of each system rather than applying a uniform pricing structure. :contentReference[oaicite:1]{index=1}
+
+---
+
+## Actuarial Design Features
+
+The product suite incorporates several key actuarial mechanisms to balance profitability and risk:
+
+- **Deductibles** to absorb high-frequency, low-severity claims  
+- **Policy limits** to cap exposure to extreme tail-risk events  
+- **Risk-based pricing** adjusted for environmental and operational differences  
+- **Portfolio diversification** across hazards and systems to stabilise aggregate losses  
+
+---
+
+## Design Rationale
+
+This product structure is designed to:
+
+- Provide comprehensive operational coverage across all major risk areas  
+- Maintain profitability under expected conditions  
+- Limit exposure to extreme catastrophic losses  
+- Adapt to CQMC’s expansion across multiple solar systems  
+
+Overall, the design achieves a balance between coverage adequacy, pricing accuracy, and long-term sustainability.
