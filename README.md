@@ -41,7 +41,7 @@ Each product is designed to reflect the distinct risk characteristics across the
 | **Workers’ Compensation (WC)** | Covers medical expenses, rehabilitation, and lost income from workplace injuries |
 | **Business Interruption (BI)** | Covers lost revenue and recovery costs from operational shutdowns |
 
-These products collectively provide full operational protection across CQMC’s mining lifecycle. :contentReference[oaicite:0]{index=0}
+These products collectively provide full operational protection across CQMC’s mining lifecycle. :contentReference
 
 ---
 
@@ -72,15 +72,15 @@ To control moral hazard and maintain pricing integrity, the following exclusions
 A core feature of the product design is differentiation across CQMC’s operating environments:
 
 - **Helionis Cluster:**  
-  Stable environment → lower overall risk, but exposure to asteroid-related equipment and transport incidents  
+  Stable environment means lower overall risk, but exposure to asteroid-related equipment and transport incidents  
 
 - **Bayesia System:**  
-  High radiation and extreme conditions → increased equipment degradation and worker risk  
+  High radiation and extreme conditions leads to increased equipment degradation and worker risk  
 
 - **Oryn Delta:**  
-  Low visibility and unstable asteroid fields → highest uncertainty, particularly for cargo transport and navigation  
+  Low visibility and unstable asteroid fields yields the highest uncertainty, particularly for cargo transport and navigation  
 
-This differentiation ensures premiums reflect the underlying risk exposure of each system rather than applying a uniform pricing structure. :contentReference[oaicite:1]{index=1}
+This differentiation ensures premiums reflect the underlying risk exposure of each system rather than applying a uniform pricing structure.
 
 ---
 
