@@ -287,3 +287,16 @@ Ongoing monitoring of claims experience, loss ratios, and exposure growth is cri
 Overall, the proposed design provides a balanced solution that supports operational resilience while maintaining long-term profitability.
 
 # References
+
+<script type="text/javascript" async
+  src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [['$','$'], ['\\(','\\)']],
+      displayMath: [['$$','$$'], ['\\[','\\]']],
+      processEscapes: true
+    }
+  });
+</script>
