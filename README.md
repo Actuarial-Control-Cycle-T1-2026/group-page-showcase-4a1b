@@ -18,6 +18,17 @@ By building predictive models and running extensive Monte Carlo simulations, our
 ---
 
 # Data Cleaning, Data Limitations, Libraries and EDA
+## Libraries Used
+To process the Cosmic Quarry Mining Corporation claims data, we utilised the following R libraries for data manipulation, statistical modelling, and visualisation:
+```r
+library(readxl)
+library(tidyverse)
+library(ggplot2)
+library(scales)
+library(forcats)
+library(MASS)
+library(dplyr)
+```
 
 # Product Design
 
