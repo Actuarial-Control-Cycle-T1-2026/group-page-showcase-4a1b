@@ -86,7 +86,6 @@ sev_clean <- sev_clean %>%
     base_salary <= 130000,
     claim_seq %in% c(1)
 )
-
 ```
 
 - Aligning the dataset by mathematically verifying that the number of claims in the severity dataset matched the claim_count listed in the frequency dataset for each entity_id.
@@ -106,7 +105,7 @@ sev_clean <- sev_clean %>%
 ```
 
 ## Data Limitations
-- To prevent biasness, our cleaning approach utilised na.omit() to drop incomplete records. While this ensures high data accuracy, it results in a reduced sample size for modelling.
+- To prevent bias, our cleaning approach utilised na.omit() to drop incomplete records. While this ensures high data accuracy, it results in a reduced sample size for modelling.
 
 - By enforcing boundary limits on variables like claim_count and claim_length it may slightly under-represent absolute worst-case tail behaviours in the raw historical data.
 
@@ -232,4 +231,4 @@ Ongoing monitoring of claims experience, loss ratios, and exposure growth is cri
 
 Overall, the proposed design provides a balanced solution that supports operational resilience while maintaining long-term profitability.
 
-# Reference
+# References
