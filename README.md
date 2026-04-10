@@ -31,10 +31,10 @@ library(dplyr)
 ```
 
 ## Data Cleaning Methodology
-The raw historical datasets contained various formatting inconsistencies, such as appended junk characters. To establish a reliable foundation for our GLM, a strict filer was applied on the provided Data Dictionary.
+The raw historical datasets contained various formatting inconsistencies, such as appended junk characters. To establish a reliable foundation for our GLM, a strict filter was applied on the provided Data Dictionary.
 
 The cleaning process involved:
-- Stripping junk characters from variable using 
+- Stripping junk characters from variable using:
 ```r 
 sub("_.*", "", policy_id).
 ```
@@ -106,7 +106,7 @@ sev_clean <- sev_clean %>%
 ```
 
 ## Data Limitations
-- To prevent biasness, our cleaning approach utilised na.omit() to drop imcomplete records. While this ensures high data accuracy, it results in a reduced sample size for modelling.
+- To prevent biasness, our cleaning approach utilised na.omit() to drop incomplete records. While this ensures high data accuracy, it results in a reduced sample size for modelling.
 
 - By enforcing boundary limits on variables like claim_count and claim_length it may slightly under-represent absolute worst-case tail behaviours in the raw historical data.
 
