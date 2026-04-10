@@ -1,6 +1,6 @@
 # Insurance Product Recommendations for Cosmic Quarry Mining Corporation
 ## View Full Report: [Final Report](https://drive.google.com/file/d/1IkmMsvpDR3kf036biBFHVD51ec5esZVQ/view?usp=sharing)
-<sub>_By: Shiyu Tu, Kevin Yu, Lalith Lakkaraju, Aiken Kwan, Alex Lee<sub>
+<sub>By: Shiyu Tu, Kevin Yu, Lalith Lakkaraju, Aiken Kwan, Alex Lee<sub>
 ---
 
 The following sections outline our actuarial methodology for assessing risk and calculating premiums, while directing you to the relevant codebases and statistical models used to generate our report's findings.
@@ -221,6 +221,19 @@ This product structure is designed to:
 
 Overall, the design achieves a balance between coverage adequacy, pricing accuracy, and long-term sustainability.
 
+---
+
+# Modelling Approach
+
+---
+
+# Financial Results
+
+---
+
+# Risk Assessment
+
+---
 
 # Final Recommendation
 
