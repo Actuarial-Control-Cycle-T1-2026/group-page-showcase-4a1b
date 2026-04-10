@@ -1,0 +1,1699 @@
+##### ================================================================================================================
+##### Assignment Set up
+##### ================================================================================================================
+setwd("C:/Users/Misac/OneDrive/Documents/R/ACTL4001")
+rm(list=ls())
+
+### Packages
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(stringr)
+library(MASS)
+
+##### ================================================================================================================
+##### Plot colours
+##### ================================================================================================================
+plot_cols <- list(
+  blue   = "#4E79A7",
+  orange = "#F28E2B",
+  green  = "#59A14F",
+  red    = "#E15759",
+  purple = "#B07AA1",
+  teal   = "#76B7B2",
+  gold   = "#EDC948",
+  pink   = "#FF9DA7",
+  brown  = "#9C755F",
+  grey   = "#BAB0AC"
+)
+
+### Read and standardise sheets
+file <- "srcsc-2026-claims-cargo.xlsx"
+freq <- read_excel(file, sheet = 1)
+sev  <- read_excel(file, sheet = 2)
+
+# Clean column names
+clean_names <- function(nms) {
+  nms <- tolower(nms)
+  nms <- gsub("\\s+", "_", nms)
+  nms <- gsub("[^a-z0-9_]", "", nms)
+  nms
+}
+names(freq) <- clean_names(names(freq))
+names(sev)  <- clean_names(names(sev))
+
+##### ================================================================================================================
+##### Helpers for cleaning corrupted IDs and text fields
+##### ================================================================================================================
+
+clean_id_pattern <- function(x, pattern) {
+  x <- as.character(x)
+  x <- str_replace_all(x, "[\u00A0]", " ")
+  x <- str_squish(x)
+  str_extract(x, pattern)
+}
+
+audit_change <- function(before, after, label) {
+  n_total   <- length(before)
+  n_changed <- sum(!is.na(before) & before != after, na.rm = TRUE)
+  n_now_na  <- sum(!is.na(before) & is.na(after))
+  cat("\n--- ID clean audit:", label, "---\n")
+  cat("Total rows:", n_total, "\n")
+  cat("Changed values:", n_changed, "\n")
+  cat("Became NA (no pattern match):", n_now_na, "\n")
+}
+
+clean_alpha_label <- function(x) {
+  x <- as.character(x)
+  x <- str_replace_all(x, "[\u00A0]", " ")
+  x <- str_squish(x)
+  x <- str_to_lower(x)
+  x <- str_extract(x, "^[a-z ]+")
+  str_squish(x)
+}
+
+clean_container_label <- function(x) {
+  x <- as.character(x)
+  x <- str_replace_all(x, "[\u00A0]", " ")
+  x <- str_squish(x)
+  x <- str_replace(x, "_.*$", "")
+  x <- str_replace(x, "[^A-Za-z \\-].*$", "")
+  str_squish(x)
+}
+
+##### ================================================================================================================
+##### Apply helper functions
+##### ================================================================================================================
+
+# Force key IDs to character first
+if ("policy_id"   %in% names(freq)) freq$policy_id   <- as.character(freq$policy_id)
+if ("shipment_id" %in% names(freq)) freq$shipment_id <- as.character(freq$shipment_id)
+
+if ("policy_id"   %in% names(sev))  sev$policy_id    <- as.character(sev$policy_id)
+if ("shipment_id" %in% names(sev))  sev$shipment_id  <- as.character(sev$shipment_id)
+if ("claim_id"    %in% names(sev))  sev$claim_id     <- as.character(sev$claim_id)
+
+### Clean IDs by expected patterns
+if ("policy_id" %in% names(freq)) {
+  before <- freq$policy_id
+  freq$policy_id <- clean_id_pattern(freq$policy_id, "CL-[0-9]{6}")
+  audit_change(before, freq$policy_id, "freq$policy_id (CL-######)")
+}
+if ("shipment_id" %in% names(freq)) {
+  before <- freq$shipment_id
+  freq$shipment_id <- clean_id_pattern(freq$shipment_id, "S-[0-9]{6}")
+  audit_change(before, freq$shipment_id, "freq$shipment_id (S-######)")
+}
+if ("policy_id" %in% names(sev)) {
+  before <- sev$policy_id
+  sev$policy_id <- clean_id_pattern(sev$policy_id, "CL-[0-9]{6}")
+  audit_change(before, sev$policy_id, "sev$policy_id (CL-######)")
+}
+if ("shipment_id" %in% names(sev)) {
+  before <- sev$shipment_id
+  sev$shipment_id <- clean_id_pattern(sev$shipment_id, "S-[0-9]{6}")
+  audit_change(before, sev$shipment_id, "sev$shipment_id (S-######)")
+}
+if ("claim_id" %in% names(sev)) {
+  before <- sev$claim_id
+  sev$claim_id <- clean_id_pattern(sev$claim_id, "CAR-C-[0-9]{7}")
+  audit_change(before, sev$claim_id, "sev$claim_id (CAR-C-#######)")
+}
+
+# Clean corrupted text fields
+if ("cargo_type" %in% names(freq))     freq$cargo_type     <- clean_alpha_label(freq$cargo_type)
+if ("cargo_type" %in% names(sev))      sev$cargo_type      <- clean_alpha_label(sev$cargo_type)
+if ("container_type" %in% names(freq)) freq$container_type <- clean_container_label(freq$container_type)
+if ("container_type" %in% names(sev))  sev$container_type  <- clean_container_label(sev$container_type)
+
+##### ================================================================================================================
+##### Frequency Cleaning
+##### ================================================================================================================
+
+required_vars_freq <- c(
+  "policy_id","shipment_id","cargo_value","weight","route_risk","distance",
+  "transit_duration","pilot_experience","vessel_age","container_type",
+  "solar_radiation","debris_density","exposure","claim_count"
+)
+required_vars_freq <- required_vars_freq[required_vars_freq %in% names(freq)]
+
+# Flag NAs and out-of-range values for each variable
+freq_flagged <- freq %>%
+  mutate(
+    bad_policy_id         = is.na(policy_id),
+    bad_shipment_id       = is.na(shipment_id),
+    
+    # Data dictionary enforced strictly
+    bad_cargo_value       = is.na(cargo_value)      | cargo_value < 50000      | cargo_value > 680000000,
+    bad_weight            = is.na(weight)           | weight < 1500            | weight > 250000,
+    bad_route_risk        = is.na(route_risk)       | !(route_risk %in% 1:5),
+    bad_distance          = is.na(distance)         | distance < 1             | distance > 100,
+    bad_transit_duration  = is.na(transit_duration) | transit_duration < 1     | transit_duration > 60,
+    bad_pilot_experience  = is.na(pilot_experience) | pilot_experience < 1     | pilot_experience > 30,
+    bad_vessel_age        = is.na(vessel_age)       | vessel_age < 1           | vessel_age > 50,
+    bad_container_type    = is.na(container_type),
+    bad_solar_radiation   = is.na(solar_radiation)  | solar_radiation < 0      | solar_radiation > 1,
+    bad_debris_density    = is.na(debris_density)   | debris_density < 0       | debris_density > 1,
+    bad_exposure          = is.na(exposure)         | exposure <= 0            | exposure > 1,
+    bad_claim_count       = is.na(claim_count)      | claim_count < 0          | claim_count > 5 | claim_count %% 1 != 0
+  ) %>%
+  mutate(
+    any_bad = bad_policy_id | bad_shipment_id | bad_cargo_value | bad_weight |
+      bad_route_risk | bad_distance | bad_transit_duration | bad_pilot_experience |
+      bad_vessel_age | bad_container_type | bad_solar_radiation |
+      bad_debris_density | bad_exposure | bad_claim_count
+  )
+
+### Frequency removal summary table
+freq_removal_summary <- tibble(
+  variable = c(
+    "policy_id","shipment_id","cargo_value","weight","route_risk","distance",
+    "transit_duration","pilot_experience","vessel_age","container_type",
+    "solar_radiation","debris_density","exposure","claim_count"
+  ),
+  bad_col = c(
+    "bad_policy_id","bad_shipment_id","bad_cargo_value","bad_weight","bad_route_risk","bad_distance",
+    "bad_transit_duration","bad_pilot_experience","bad_vessel_age","bad_container_type",
+    "bad_solar_radiation","bad_debris_density","bad_exposure","bad_claim_count"
+  ),
+  reason = c(
+    "Missing / invalid policy ID",
+    "Missing / invalid shipment ID",
+    "Missing or outside 50K–680,000K",
+    "Missing or outside 1.5K–250K",
+    "Missing or outside {1,2,3,4,5}",
+    "Missing or outside 1–100",
+    "Missing or outside 1–60",
+    "Missing or outside 1–30",
+    "Missing or outside 1–50",
+    "Missing / invalid container type",
+    "Missing or outside 0–1",
+    "Missing or outside 0–1",
+    "Missing or outside (0,1]",
+    "Missing, non-integer, or outside 0–5"
+  )
+) %>%
+  rowwise() %>%
+  mutate(
+    n_removed = sum(freq_flagged[[bad_col]], na.rm = TRUE),
+    pct_removed = 100 * n_removed / nrow(freq)
+  ) %>%
+  ungroup() %>%
+  dplyr::select(variable, n_removed, pct_removed, reason) %>%
+  arrange(desc(n_removed))
+
+cat("\n--- Frequency removal summary by variable ---\n")
+print(freq_removal_summary)
+
+### Example bad rows (frequency)
+cat("\n--- Example frequency rows with issues (first 10) ---\n")
+print(
+  freq_flagged %>%
+    filter(any_bad) %>%
+    dplyr::select(policy_id, shipment_id, starts_with("bad_")) %>%
+    head(10)
+)
+
+### Clean frequency
+freq_clean <- freq_flagged %>%
+  filter(!any_bad) %>%
+  dplyr::select(-starts_with("bad_"), -any_bad)
+
+cat("\n--- Frequency cleaning summary ---\n")
+cat("Rows before:", nrow(freq), "\n")
+cat("Rows after :", nrow(freq_clean), "\n")
+cat("Removed    :", nrow(freq) - nrow(freq_clean), "\n")
+cat("Percentage removed:", 100 * (nrow(freq) - nrow(freq_clean)) / nrow(freq), "\n")
+
+##### ================================================================================================================
+##### Severity cleaning
+##### ================================================================================================================
+
+sev_flagged <- sev %>%
+  mutate(
+    bad_policy_id         = is.na(policy_id),
+    bad_shipment_id       = is.na(shipment_id),
+    bad_claim_id          = if ("claim_id" %in% names(sev)) is.na(claim_id) else FALSE,
+    
+    # Strict severity + same structural covariates
+    bad_claim_amount      = is.na(claim_amount)     | claim_amount < 31000      | claim_amount > 678000000,
+    bad_cargo_value       = is.na(cargo_value)      | cargo_value < 50000       | cargo_value > 680000000,
+    bad_weight            = is.na(weight)           | weight < 1500             | weight > 250000,
+    bad_route_risk        = is.na(route_risk)       | !(route_risk %in% 1:5),
+    bad_distance          = is.na(distance)         | distance < 1              | distance > 100,
+    bad_transit_duration  = is.na(transit_duration) | transit_duration < 1      | transit_duration > 60,
+    bad_pilot_experience  = is.na(pilot_experience) | pilot_experience < 1      | pilot_experience > 30,
+    bad_vessel_age        = is.na(vessel_age)       | vessel_age < 1            | vessel_age > 50,
+    bad_cargo_type        = is.na(cargo_type),
+    bad_container_type    = is.na(container_type),
+    bad_solar_radiation   = is.na(solar_radiation)  | solar_radiation < 0       | solar_radiation > 1,
+    bad_debris_density    = is.na(debris_density)   | debris_density < 0        | debris_density > 1,
+    bad_exposure          = is.na(exposure)         | exposure <= 0             | exposure > 1
+  ) %>%
+  mutate(
+    any_bad = bad_policy_id | bad_shipment_id | bad_claim_id | bad_claim_amount |
+      bad_cargo_type | bad_cargo_value | bad_weight | bad_route_risk | bad_distance |
+      bad_transit_duration | bad_pilot_experience | bad_vessel_age |
+      bad_container_type | bad_solar_radiation | bad_debris_density | bad_exposure
+  )
+
+### Severity removal summary table
+sev_removal_summary <- tibble(
+  variable = c(
+    "policy_id","shipment_id","claim_id","claim_amount","cargo type","cargo_value","weight",
+    "route_risk","distance","transit_duration","pilot_experience","vessel_age",
+    "container_type","solar_radiation","debris_density","exposure"
+  ),
+  bad_col = c(
+    "bad_policy_id","bad_shipment_id","bad_claim_id","bad_claim_amount","bad_cargo_type","bad_cargo_value","bad_weight",
+    "bad_route_risk","bad_distance","bad_transit_duration","bad_pilot_experience","bad_vessel_age",
+    "bad_container_type","bad_solar_radiation","bad_debris_density","bad_exposure"
+  ),
+  reason = c(
+    "Missing / invalid policy ID",
+    "Missing / invalid shipment ID",
+    "Missing / invalid claim ID",
+    "Missing or outside 31K–678,000K",
+    "Missing / invalid cargo type",
+    "Missing or outside 50K–680,000K",
+    "Missing or outside 1.5K–250K",
+    "Missing or outside {1,2,3,4,5}",
+    "Missing or outside 1–100",
+    "Missing or outside 1–60",
+    "Missing or outside 1–30",
+    "Missing or outside 1–50",
+    "Missing / invalid container type",
+    "Missing or outside 0–1",
+    "Missing or outside 0–1",
+    "Missing or outside (0,1]"
+  )
+) %>%
+  rowwise() %>%
+  mutate(
+    n_removed = sum(sev_flagged[[bad_col]], na.rm = TRUE),
+    pct_removed = 100 * n_removed / nrow(sev)
+  ) %>%
+  ungroup() %>%
+  dplyr::select(variable, n_removed, pct_removed, reason) %>%
+  arrange(desc(n_removed))
+
+cat("\n--- Severity removal summary by variable ---\n")
+print(sev_removal_summary)
+
+### Example bad rows (severity)
+cat("\n--- Example severity rows with issues (first 10) ---\n")
+print(
+  sev_flagged %>%
+    filter(any_bad) %>%
+    dplyr::select(policy_id, shipment_id, claim_id, starts_with("bad_")) %>%
+    head(10)
+)
+
+### Clean severity
+sev_clean <- sev_flagged %>%
+  filter(!any_bad) %>%
+  dplyr::select(-starts_with("bad_"), -any_bad)
+
+cat("\n--- Severity cleaning summary ---\n")
+cat("Rows before:", nrow(sev), "\n")
+cat("Rows after :", nrow(sev_clean), "\n")
+cat("Removed    :", nrow(sev) - nrow(sev_clean), "\n")
+cat("Percentage removed:", 100 * (nrow(sev) - nrow(sev_clean)) / nrow(sev), "\n")
+
+##### ================================================================================================================
+##### Merging frequency and severity
+##### ================================================================================================================
+
+# Aggregate severity to shipment level
+sev_ship <- sev_clean %>%
+  group_by(policy_id, shipment_id) %>%
+  summarise(
+    n_claims_sev = n(),
+    total_claim_amount = sum(claim_amount, na.rm = TRUE),
+    max_claim_amount   = max(claim_amount, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Merge
+cargo_merged <- freq_clean %>%
+  left_join(sev_ship, by = c("policy_id", "shipment_id")) %>%
+  mutate(
+    n_claims_sev = ifelse(is.na(n_claims_sev), 0, n_claims_sev),
+    total_claim_amount = ifelse(is.na(total_claim_amount), 0, total_claim_amount),
+    max_claim_amount   = ifelse(is.na(max_claim_amount), 0, max_claim_amount)
+  )
+
+cat("\n--- Merge summary ---\n")
+cat("freq_clean rows:", nrow(freq_clean), "\n")
+cat("sev_clean rows :", nrow(sev_clean), "\n")
+cat("merged rows    :", nrow(cargo_merged), "\n")
+
+##### ================================================================================================================
+##### Consistency checks
+##### ================================================================================================================
+
+# A) claim_count vs severity count
+check_diff <- cargo_merged %>%
+  mutate(diff = claim_count - n_claims_sev) %>%
+  count(diff) %>%
+  arrange(desc(n))
+
+cat("\n--- claim_count - n_claims_sev distribution ---\n")
+print(check_diff)
+
+# B) identify mismatch rows BEFORE removal
+mismatch_rows <- cargo_merged %>%
+  mutate(
+    mismatch_type = case_when(
+      claim_count == n_claims_sev ~ "match",
+      claim_count > n_claims_sev  ~ "freq_claim_count_greater_than_sev_count",
+      claim_count < n_claims_sev  ~ "sev_count_greater_than_freq_claim_count",
+      TRUE ~ "other"
+    )
+  ) %>%
+  filter(mismatch_type != "match")
+
+cat("\n--- Example mismatch rows BEFORE removal (first 10) ---\n")
+print(
+  mismatch_rows %>%
+    dplyr::select(policy_id, shipment_id, claim_count, n_claims_sev, mismatch_type) %>%
+    head(10)
+)
+
+mismatch_summary <- mismatch_rows %>%
+  count(mismatch_type, name = "n_removed") %>%
+  mutate(
+    pct_removed = 100 * n_removed / nrow(cargo_merged),
+    reason = case_when(
+      mismatch_type == "freq_claim_count_greater_than_sev_count" ~ "Frequency claim_count exceeds valid severity claim rows",
+      mismatch_type == "sev_count_greater_than_freq_claim_count" ~ "Severity claim rows exceed frequency claim_count",
+      TRUE ~ "Other count mismatch"
+    )
+  )
+
+cat("\n--- Mismatch removal summary ---\n")
+print(mismatch_summary)
+
+# C) Remove mismatches entirely
+cargo_merged_clean <- cargo_merged %>%
+  filter(claim_count == n_claims_sev)
+
+cat("\n--- Mismatch cleaning summary ---\n")
+cat("Rows before mismatch removal:", nrow(cargo_merged), "\n")
+cat("Rows after mismatch removal :", nrow(cargo_merged_clean), "\n")
+cat("Removed                    :", nrow(cargo_merged) - nrow(cargo_merged_clean), "\n")
+cat("Percentage removed                :", 100 * (nrow(cargo_merged) - nrow(cargo_merged_clean)) / nrow(cargo_merged), "\n")
+
+# D) Check any total loss > cargo value AFTER mismatch removal
+loss_gt_value <- cargo_merged_clean %>%
+  filter(cargo_value > 0, total_claim_amount > cargo_value) %>%
+  summarise(
+    n = n(),
+    pct = 100 * n() / nrow(cargo_merged_clean)
+  )
+
+cat("\n--- total loss exceeds cargo value ---\n")
+print(loss_gt_value)
+
+### Logical consistency filter: remove extreme loss ratios
+extreme_loss_rows <- cargo_merged %>%
+  filter(total_claim_amount > 2 * cargo_value)
+
+cat("\nRows with loss_ratio > 2:", nrow(extreme_loss_rows), "\n")
+
+cargo_merged_clean <- cargo_merged %>%
+  filter(total_claim_amount <= 2 * cargo_value)
+
+cat("\nRows before loss filter:", nrow(cargo_merged), "\n")
+cat("Rows after loss filter :", nrow(cargo_merged_clean), "\n")
+cat("Rows removed           :", nrow(cargo_merged) - nrow(cargo_merged_clean), "\n")
+
+loss_ratio_summary <- tibble(
+  dataset = "merged_consistency",
+  variable = "loss_ratio > 2",
+  n_removed = nrow(extreme_loss_rows),
+  pct_removed = 100 * nrow(extreme_loss_rows) / nrow(cargo_merged),
+  reason = "Total claim amount exceeds twice the cargo value (likely data error)"
+)
+##### ================================================================================================================
+##### Overall removal summary table
+##### ================================================================================================================
+
+overall_removal_summary <- bind_rows(
+  freq_removal_summary %>%
+    mutate(dataset = "frequency") %>%
+    dplyr::select(dataset, variable, n_removed, pct_removed, reason),
+  
+  sev_removal_summary %>%
+    mutate(dataset = "severity") %>%
+    dplyr::select(dataset, variable, n_removed, pct_removed, reason),
+  
+  mismatch_summary %>%
+    transmute(
+      dataset = "merged_consistency",
+      variable = mismatch_type,
+      n_removed = n_removed,
+      pct_removed = pct_removed,
+      reason = reason
+    ),
+  loss_ratio_summary
+)
+
+cat("\n--- Overall removal summary ---\n")
+print(overall_removal_summary, n = Inf)
+
+##### ================================================================================================================
+##### Derived fields for EDA later
+##### ================================================================================================================
+
+cargo_merged_clean <- cargo_merged_clean %>%
+  mutate(
+    loss_ratio = ifelse(cargo_value > 0, total_claim_amount / cargo_value, NA_real_),
+    claim_rate = claim_count / exposure
+  )
+
+# Use cargo_merged_clean for EDA from here onward
+
+##### ================================================================================================================
+##### EDA
+##### ================================================================================================================
+
+### Frequency Analysis
+# Distribution of Claim Count
+freq_table <- cargo_merged_clean %>%
+  count(claim_count) %>%
+  mutate(percentage = 100 * n / sum(n))
+print(freq_table)
+
+ggplot(cargo_merged_clean, aes(x = factor(claim_count), fill = factor(claim_count))) +
+  geom_bar() +
+  scale_fill_manual(values = c(
+    plot_cols$blue, plot_cols$orange, plot_cols$green,
+    plot_cols$red, plot_cols$purple, plot_cols$teal
+  )) +
+  labs(title = "Claim Count Distribution",
+       x = "Number of Claims",
+       y = "Number of Shipments",
+       fill = "Claim Count")
+
+# Poisson Distribution Check
+mean_claims <- mean(cargo_merged_clean$claim_count)
+var_claims  <- var(cargo_merged_clean$claim_count)
+
+print(mean_claims)
+print(var_claims)
+
+# Ratio
+print(var_claims / mean_claims)
+# Note: If variance > mean, there is overdispersion, so Negative Binomial may be more appropriate than Poisson
+
+# Zero inflation
+prop_zero <- mean(cargo_merged_clean$claim_count == 0)
+print(prop_zero)
+
+# Compare observed zero proportion against Poisson expectation
+poisson_zero_expected <- exp(-mean_claims)
+print(poisson_zero_expected)
+# If observed zero proportion is materially larger than exp(-mean_claims), then zero inflation may be present
+
+# Exposure-Adjusted Frequency
+summary(cargo_merged_clean$claim_rate)
+
+ggplot(cargo_merged_clean, aes(x = claim_rate)) +
+  geom_histogram(bins = 100, fill = plot_cols$blue, colour = "white") +
+  labs(title = "Claim Rate Distribution",
+       x = "Claim Rate (claims / exposure)",
+       y = "Count")
+# Note: Very large claim_rate values can occur when exposure is very small,
+# e.g. 3 claims over 0.05 exposure gives a claim rate of 60
+
+## Frequency by Hazard Variables
+make_qbin <- function(x, k = 5) {
+  qs <- quantile(x, probs = seq(0, 1, length.out = k + 1), na.rm = TRUE)
+  qs <- unique(qs)
+  if (length(qs) < 3) return(rep(NA, length(x)))
+  cut(x, breaks = qs, include.lowest = TRUE, right = TRUE)
+}
+
+# Frequency by route risk
+freq_by_route <- cargo_merged_clean %>%
+  group_by(route_risk) %>%
+  summarise(
+    mean_claims = mean(claim_count),
+    zero_rate   = mean(claim_count == 0),
+    mean_rate   = mean(claim_count / exposure),
+    n           = n(),
+    .groups = "drop"
+  ) %>%
+  arrange(route_risk)
+print(freq_by_route)
+
+# Plot mean claims and zero rate by route risk
+ggplot(cargo_merged_clean, aes(x = factor(route_risk), y = claim_count, fill = factor(route_risk))) +
+  stat_summary(fun = mean, geom = "bar") +
+  scale_fill_manual(values = c(
+    plot_cols$blue, plot_cols$orange, plot_cols$green,
+    plot_cols$red, plot_cols$purple
+  )) +
+  labs(title = "Mean Claim Count by Route Risk",
+       x = "Route Risk",
+       y = "Mean Claim Count",
+       fill = "Route Risk")
+
+ggplot(freq_by_route, aes(x = factor(route_risk), y = zero_rate, fill = factor(route_risk))) +
+  geom_col() +
+  scale_fill_manual(values = c(
+    plot_cols$blue, plot_cols$orange, plot_cols$green,
+    plot_cols$red, plot_cols$purple
+  )) +
+  labs(title = "Zero-Claim Rate by Route Risk",
+       x = "Route Risk",
+       y = "Proportion with 0 claims",
+       fill = "Route Risk")
+
+# Bucket into 5 quantile bins and summarise
+summarise_freq_bucket <- function(df, var, k = 5) {
+  x <- df[[var]]
+  out <- df %>%
+    mutate(bucket = make_qbin(x, k = k)) %>%
+    filter(!is.na(bucket)) %>%
+    group_by(bucket) %>%
+    summarise(
+      mean_claims = mean(claim_count),
+      zero_rate   = mean(claim_count == 0),
+      mean_rate   = mean(claim_count / exposure),
+      n = n(),
+      .groups = "drop"
+    )
+  out$variable <- var
+  out
+}
+
+vars_cont <- c("debris_density","solar_radiation","distance",
+               "pilot_experience","vessel_age")
+vars_cont <- vars_cont[vars_cont %in% names(cargo_merged_clean)]
+
+freq_by_cont <- bind_rows(
+  lapply(vars_cont, function(v) summarise_freq_bucket(cargo_merged_clean, v, k = 5))
+)
+print(freq_by_cont)
+
+ggplot(freq_by_cont,
+       aes(x = bucket, y = mean_claims, group = 1, colour = variable)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  facet_wrap(~ variable, scales = "free_x") +
+  labs(title = "Mean Claim Count by Hazard (Quantile Bins)",
+       x = "Hazard Bin",
+       y = "Mean Claim Count",
+       colour = "Variable") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+### Severity Analysis
+# Basic Distribution
+print(summary(sev_clean$claim_amount))
+
+# Tail quantiles
+print(quantile(sev_clean$claim_amount,
+               probs = c(0.90, 0.95, 0.99, 0.995, 0.999),
+               na.rm = TRUE))
+
+ggplot(sev_clean, aes(x = claim_amount)) +
+  geom_histogram(bins = 100, fill = plot_cols$orange, colour = "white") +
+  scale_x_log10() +
+  labs(title = "Claim Amount (log scale)",
+       x = "Claim Amount (log scale)",
+       y = "Count")
+# Note: If the log-scale histogram shows more than one hump,
+# the severity distribution may be mixture-like / regime-driven rather than coming from one single family
+
+# Severity by route risk
+sev_route <- sev_clean %>%
+  group_by(route_risk) %>%
+  summarise(
+    mean_sev   = mean(claim_amount),
+    median_sev = median(claim_amount),
+    p99        = quantile(claim_amount, 0.99),
+    n          = n(),
+    .groups = "drop"
+  )
+print(sev_route)
+
+ggplot(sev_route, aes(x = factor(route_risk), y = mean_sev, fill = factor(route_risk))) +
+  geom_col() +
+  scale_fill_manual(values = c(
+    plot_cols$blue, plot_cols$orange, plot_cols$green,
+    plot_cols$red, plot_cols$purple
+  )) +
+  labs(title = "Mean Severity by Route Risk",
+       x = "Route Risk",
+       y = "Mean Claim Amount",
+       fill = "Route Risk")
+
+# Regime / Mixture Investigation
+ggplot(sev_clean, aes(x = claim_amount, fill = factor(route_risk))) +
+  geom_histogram(bins = 80, colour = "white") +
+  scale_x_log10() +
+  facet_wrap(~ route_risk, scales = "free_y") +
+  labs(fill = "Route Risk")
+# If the bimodal / multi-hump structure persists within route risk groups,
+# then route risk alone may not explain the mixture behaviour
+
+ggplot(sev_clean, aes(x = factor(route_risk),
+                      y = log(claim_amount))) +
+  geom_boxplot()
+
+# Checking by cargo type
+print(table(sev_clean$cargo_type, useNA = "ifany"))
+
+ggplot(sev_clean, aes(x = claim_amount)) +
+  geom_histogram(bins = 80) +
+  scale_x_log10() +
+  facet_wrap(~ cargo_type, scales = "free_y")
+# If shapes are broadly similar across cargo types, cargo type may shift severity levels
+# but not fully explain the apparent mixture structure
+
+# Severity by continuous hazards
+summarise_sev_bucket <- function(df, var, k = 5) {
+  x <- df[[var]]
+  out <- df %>%
+    mutate(bucket = make_qbin(x, k = k)) %>%
+    filter(!is.na(bucket)) %>%
+    group_by(bucket) %>%
+    summarise(
+      mean_sev   = mean(claim_amount),
+      median_sev = median(claim_amount),
+      p95_sev    = quantile(claim_amount, 0.95),
+      p99_sev    = quantile(claim_amount, 0.99),
+      n = n(),
+      .groups = "drop"
+    )
+  out$variable <- var
+  out
+}
+
+vars_cont_sev <- c("debris_density","solar_radiation","distance",
+                   "pilot_experience","vessel_age")
+vars_cont_sev <- vars_cont_sev[vars_cont_sev %in% names(sev_clean)]
+
+sev_by_cont <- bind_rows(
+  lapply(vars_cont_sev, function(v) summarise_sev_bucket(sev_clean, v, k = 5))
+)
+print(sev_by_cont)
+
+ggplot(sev_by_cont,
+       aes(x = bucket, y = p99_sev, group = 1, colour = variable)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  facet_wrap(~ variable, scales = "free_x") +
+  labs(title = "99th Percentile Severity by Hazard (Quantile Bins)",
+       x = "Hazard Bin",
+       y = "P99 Claim Amount",
+       colour = "Variable") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+### Loss Ratio & Tail Risk
+# Loss Ratio Distribution
+print(summary(cargo_merged_clean$loss_ratio))
+
+print(quantile(cargo_merged_clean$loss_ratio,
+               probs = c(0.90, 0.95, 0.99, 0.995, 0.999),
+               na.rm = TRUE))
+# Example interpretation:
+# 99% of shipments lose less than the 99th percentile of cargo value
+
+# Plot only positive loss ratios on log scale
+ggplot(cargo_merged_clean %>% filter(loss_ratio > 0), aes(x = loss_ratio)) +
+  geom_histogram(bins = 100, fill = plot_cols$green, colour = "white") +
+  scale_x_log10() +
+  labs(title = "Loss Ratio Distribution (log scale)",
+       x = "Loss Ratio (log scale)",
+       y = "Count")
+
+# Extreme Loss Ratio Cases
+extreme_lr <- cargo_merged_clean %>%
+  filter(loss_ratio > 1)
+print(nrow(extreme_lr))
+# Loss ratio > 1 means total claim amount exceeds cargo value
+
+# Optional: inspect the extreme rows
+print(
+  extreme_lr %>%
+    dplyr::select(policy_id, shipment_id, cargo_type, cargo_value,
+           total_claim_amount, loss_ratio, claim_count) %>%
+    arrange(desc(loss_ratio)) %>%
+    head(10)
+)
+
+# Approximate Expected Loss per Shipment
+cargo_merged_clean <- cargo_merged_clean %>%
+  mutate(expected_loss_simple = claim_rate * mean(sev_clean$claim_amount))
+
+summary(cargo_merged_clean$expected_loss_simple)
+# Note: This is only a simple approximation:
+# E(loss) ≈ E(frequency) × E(severity)
+# In reality, both frequency and severity depend on hazard variables,
+# so a more refined pricing model would use lambda(x) × mu(x)
+
+# Tail Risk Contribution (Top 1%)
+threshold_99 <- quantile(cargo_merged_clean$total_claim_amount, 0.99, na.rm = TRUE)
+
+tail_contribution <- cargo_merged_clean %>%
+  summarise(
+    total_loss = sum(total_claim_amount, na.rm = TRUE),
+    tail_loss  = sum(total_claim_amount[total_claim_amount >= threshold_99], na.rm = TRUE)
+  )
+
+tail_contribution$tail_share_pct <-
+  100 * tail_contribution$tail_loss / tail_contribution$total_loss
+
+print(tail_contribution)
+# If the top 1% contributes a very large share of losses,
+# then the portfolio is strongly tail-driven
+
+##### ================================================================================================================
+##### Modelling Stage 
+##### ================================================================================================================
+
+##### ================================================================================================================
+##### 0) Assumptions for Returns / Net Revenue
+##### ================================================================================================================
+# These are simple pricing assumptions so that the model can produce:
+# 1. aggregate costs
+# 2. aggregate returns
+# 3. aggregate net revenue
+#
+# Revise later if your team chooses different pricing assumptions.
+
+expense_loading <- 0.10
+risk_loading    <- 0.15
+profit_loading  <- 0.05
+
+total_loading <- (1+expense_loading)*(1+risk_loading)*(1+profit_loading)-1
+
+# Short-term and long-term horizon multipliers
+# (Simple illustrative assumption: long-term = 5 years of equivalent exposure)
+short_term_years <- 1
+long_term_years  <- 5
+
+##### ================================================================================================================
+##### 1) Frequency Modelling
+##### ================================================================================================================
+freq_model_data <- cargo_merged_clean %>%
+  dplyr::select(
+    claim_count, exposure,
+    route_risk, debris_density, solar_radiation,
+    distance, pilot_experience, vessel_age,
+    cargo_type, container_type
+  ) %>%
+  na.omit()
+
+### Convert categorical variables
+freq_model_data <- freq_model_data %>%
+  mutate(
+    route_risk = factor(route_risk),
+    cargo_type = factor(cargo_type),
+    container_type = factor(container_type)
+  )
+
+### Poisson model
+freq_pois <- glm(
+  claim_count ~ route_risk + debris_density + solar_radiation +
+    distance + pilot_experience + vessel_age +
+    cargo_type + container_type +
+    offset(log(exposure)),
+  family = poisson(link = "log"),
+  data = freq_model_data
+)
+
+summary(freq_pois)
+
+### Check overdispersion
+dispersion_stat <- sum(residuals(freq_pois, type = "pearson")^2) / freq_pois$df.residual
+cat("Poisson dispersion statistic:", dispersion_stat, "\n")
+
+### Negative Binomial model
+freq_nb <- glm.nb(
+  claim_count ~ route_risk + debris_density + solar_radiation +
+    distance + pilot_experience + vessel_age +
+    cargo_type + container_type +
+    offset(log(exposure)),
+  data = freq_model_data
+)
+
+summary(freq_nb)
+
+### Compare models
+cat("\n--- Frequency model comparison ---\n")
+print(AIC(freq_pois, freq_nb))
+
+##### ================================================================================================================
+##### 2) Severity Modelling
+##### ================================================================================================================
+
+### Use severity data
+sev_model_data <- sev_clean %>%
+  dplyr::select(
+    claim_amount,
+    route_risk, debris_density, solar_radiation,
+    distance, pilot_experience, vessel_age,
+    cargo_type, container_type
+  ) %>%
+  filter(claim_amount > 0) %>%
+  na.omit()
+
+### Convert categorical variables
+sev_model_data <- sev_model_data %>%
+  mutate(
+    route_risk = factor(route_risk),
+    cargo_type = factor(cargo_type),
+    container_type = factor(container_type)
+  )
+
+### Lognormal-style model: linear model on log severity
+sev_lognorm <- lm(
+  log(claim_amount) ~ route_risk + debris_density + solar_radiation +
+    distance + pilot_experience + vessel_age +
+    cargo_type + container_type,
+  data = sev_model_data
+)
+
+summary(sev_lognorm)
+
+### Gamma GLM with log link
+sev_gamma <- glm(
+  claim_amount ~ route_risk + debris_density + solar_radiation +
+    distance + pilot_experience + vessel_age +
+    cargo_type + container_type,
+  family = Gamma(link = "log"),
+  data = sev_model_data
+)
+
+summary(sev_gamma)
+
+### Compare severity models
+cat("\n--- Severity model comparison ---\n")
+print(AIC(sev_lognorm, sev_gamma))
+
+##### ================================================================================================================
+##### 3) Predict Frequency and Severity
+##### ================================================================================================================
+
+### Base prediction data
+pricing_base <- cargo_merged_clean %>%
+  dplyr::select(
+    policy_id, shipment_id,
+    exposure, cargo_value,
+    route_risk, debris_density, solar_radiation,
+    distance, pilot_experience, vessel_age,
+    cargo_type, container_type
+  ) %>%
+  na.omit()
+
+### --------------------------------
+### Frequency prediction dataset
+### --------------------------------
+pricing_freq <- pricing_base %>%
+  mutate(
+    route_risk = factor(as.character(route_risk), levels = levels(freq_model_data$route_risk)),
+    cargo_type = factor(as.character(cargo_type), levels = levels(freq_model_data$cargo_type)),
+    container_type = factor(as.character(container_type), levels = levels(freq_model_data$container_type))
+  )
+
+cat("\n--- NA check after aligning to freq model ---\n")
+print(colSums(is.na(pricing_freq)))
+
+### Predict frequency
+pricing_freq$lambda_hat <- predict(freq_nb, newdata = pricing_freq, type = "response")
+
+cat("\n--- Predicted frequency summary ---\n")
+print(summary(pricing_freq$lambda_hat))
+
+### --------------------------------
+### Severity prediction dataset
+### --------------------------------
+pricing_sev <- pricing_base %>%
+  mutate(
+    route_risk = factor(as.character(route_risk), levels = levels(sev_model_data$route_risk)),
+    cargo_type = factor(as.character(cargo_type), levels = levels(sev_model_data$cargo_type)),
+    container_type = factor(as.character(container_type), levels = levels(sev_model_data$container_type))
+  )
+
+cat("\n--- NA check after aligning to severity model ---\n")
+print(colSums(is.na(pricing_sev)))
+
+### Predict severity from Gamma
+pricing_sev$mu_hat_gamma <- predict(sev_gamma, newdata = pricing_sev, type = "response")
+
+### Predict severity from Lognormal
+sigma2_lognorm <- summary(sev_lognorm)$sigma^2
+log_pred <- predict(sev_lognorm, newdata = pricing_sev)
+pricing_sev$mu_hat_lognorm <- exp(log_pred + 0.5 * sigma2_lognorm)
+
+cat("\n--- Predicted severity summary (Gamma) ---\n")
+print(summary(pricing_sev$mu_hat_gamma))
+
+cat("\n--- Predicted severity summary (Lognormal) ---\n")
+print(summary(pricing_sev$mu_hat_lognorm))
+
+### --------------------------------
+### Combine predictions
+### --------------------------------
+pricing_data <- pricing_base %>%
+  mutate(
+    lambda_hat = pricing_freq$lambda_hat,
+    mu_hat_gamma = pricing_sev$mu_hat_gamma,
+    mu_hat_lognorm = pricing_sev$mu_hat_lognorm
+  )
+
+### Expected loss per shipment (pure premium)
+pricing_data <- pricing_data %>%
+  mutate(
+    pure_premium_gamma = lambda_hat * mu_hat_gamma,
+    pure_premium_lognorm = lambda_hat * mu_hat_lognorm
+  )
+
+cat("\n--- Pure premium summary (Gamma severity) ---\n")
+print(summary(pricing_data$pure_premium_gamma))
+
+cat("\n--- Pure premium summary (Lognormal severity) ---\n")
+print(summary(pricing_data$pure_premium_lognorm))
+
+cat("Average pure premium (Gamma severity):",
+    mean(pricing_data$pure_premium_gamma, na.rm = TRUE), "\n")
+cat("Average pure premium (Lognormal severity):",
+    mean(pricing_data$pure_premium_lognorm, na.rm = TRUE), "\n")
+
+##### ================================================================================================================
+##### 4) Model Diagnostics / Quick Checks
+##### ================================================================================================================
+
+### Frequency fitted vs observed
+freq_model_data$fitted_nb <- fitted(freq_nb)
+
+ggplot(freq_model_data, aes(x = fitted_nb, y = claim_count)) +
+  geom_point(alpha = 0.2, colour = plot_cols$blue) +
+  labs(title = "Observed vs Fitted Claim Counts (NB)",
+       x = "Fitted Claim Count",
+       y = "Observed Claim Count")
+
+### Severity fitted vs observed (Gamma)
+sev_model_data$fitted_gamma <- fitted(sev_gamma)
+
+ggplot(sev_model_data, aes(x = fitted_gamma, y = claim_amount)) +
+  geom_point(alpha = 0.2, colour = plot_cols$red) +
+  labs(title = "Observed vs Fitted Severity (Gamma)",
+       x = "Fitted Claim Amount",
+       y = "Observed Claim Amount")
+
+##### ================================================================================================================
+##### 5) Aggregate Loss Simulation
+##### Preferred final  model: Negative Binomial + Lognormal
+##### ================================================================================================================
+
+set.seed(123)
+
+n_sims <- 5000
+aggregate_costs_short <- numeric(n_sims)
+aggregate_costs_long  <- numeric(n_sims)
+
+### Lognormal residual standard deviation
+sigma_lognorm <- summary(sev_lognorm)$sigma
+
+for (s in 1:n_sims) {
+  
+  ### ------------------------------
+  ### Short-term simulation
+  ### ------------------------------
+  sim_counts_short <- rnbinom(
+    n = nrow(pricing_data),
+    mu = pricing_data$lambda_hat * short_term_years,
+    size = freq_nb$theta
+  )
+  
+  sim_loss_short <- 0
+  
+  for (i in seq_along(sim_counts_short)) {
+    n_i <- sim_counts_short[i]
+    
+    if (n_i > 0) {
+      meanlog_i <- log(pricing_data$mu_hat_lognorm[i]) - 0.5 * sigma_lognorm^2
+      sim_sev <- rlnorm(n_i, meanlog = meanlog_i, sdlog = sigma_lognorm)
+      sim_loss_short <- sim_loss_short + sum(sim_sev)
+    }
+  }
+  
+  aggregate_costs_short[s] <- sim_loss_short
+  
+  ### ------------------------------
+  ### Long-term simulation
+  ### ------------------------------
+  sim_counts_long <- rnbinom(
+    n = nrow(pricing_data),
+    mu = pricing_data$lambda_hat * long_term_years,
+    size = freq_nb$theta
+  )
+  
+  sim_loss_long <- 0
+  
+  for (i in seq_along(sim_counts_long)) {
+    n_i <- sim_counts_long[i]
+    
+    if (n_i > 0) {
+      meanlog_i <- log(pricing_data$mu_hat_lognorm[i]) - 0.5 * sigma_lognorm^2
+      sim_sev <- rlnorm(n_i, meanlog = meanlog_i, sdlog = sigma_lognorm)
+      sim_loss_long <- sim_loss_long + sum(sim_sev)
+    }
+  }
+  
+  aggregate_costs_long[s] <- sim_loss_long
+}
+
+##### ================================================================================================================
+##### 6) Aggregate Costs, Returns, and Net Revenue
+##### ================================================================================================================
+
+### Aggregate return assumptions
+# Technical premium = expected loss × (1 + total loading)
+expected_aggregate_cost_short <- mean(aggregate_costs_short)
+expected_aggregate_cost_long  <- mean(aggregate_costs_long)
+
+aggregate_return_short <- rep(expected_aggregate_cost_short * (1 + total_loading), n_sims)
+aggregate_return_long  <- rep(expected_aggregate_cost_long  * (1 + total_loading), n_sims)
+
+### Net revenue = returns - costs
+aggregate_net_revenue_short <- aggregate_return_short - aggregate_costs_short
+aggregate_net_revenue_long  <- aggregate_return_long  - aggregate_costs_long
+
+##### ================================================================================================================
+##### 7) Summary Tables: Costs, Returns, Net Revenue
+##### ================================================================================================================
+
+summary_stats <- function(x) {
+  c(
+    mean = mean(x),
+    variance = var(x),
+    sd = sd(x),
+    p90 = quantile(x, 0.90),
+    p95 = quantile(x, 0.95),
+    p99 = quantile(x, 0.99),
+    p995 = quantile(x, 0.995),
+    p999 = quantile(x, 0.999)
+  )
+}
+
+### Short-term summary
+short_term_summary <- rbind(
+  costs = summary_stats(aggregate_costs_short),
+  returns = summary_stats(aggregate_return_short),
+  net_revenue = summary_stats(aggregate_net_revenue_short)
+)
+
+### Long-term summary
+long_term_summary <- rbind(
+  costs = summary_stats(aggregate_costs_long),
+  returns = summary_stats(aggregate_return_long),
+  net_revenue = summary_stats(aggregate_net_revenue_long)
+)
+
+cat("\n--- Short-term Aggregate Summary ---\n")
+print(short_term_summary)
+
+cat("\n--- Long-term Aggregate Summary ---\n")
+print(long_term_summary)
+
+##### ================================================================================================================
+##### 8) Additional Tail Diagnostics
+##### ================================================================================================================
+
+### Tail concentration of costs
+tail_share_short <- sum(aggregate_costs_short[aggregate_costs_short >= quantile(aggregate_costs_short, 0.99)]) /
+  sum(aggregate_costs_short)
+
+tail_share_long <- sum(aggregate_costs_long[aggregate_costs_long >= quantile(aggregate_costs_long, 0.99)]) /
+  sum(aggregate_costs_long)
+
+cat("\nTop 1% share of short-term aggregate costs:", 100 * tail_share_short, "%\n")
+cat("Top 1% share of long-term aggregate costs :", 100 * tail_share_long, "%\n")
+
+##### ================================================================================================================
+##### 9) Plots
+##### ================================================================================================================
+
+agg_short_df <- data.frame(aggregate_cost = aggregate_costs_short)
+agg_long_df  <- data.frame(aggregate_cost = aggregate_costs_long)
+
+ggplot(agg_short_df, aes(x = aggregate_cost)) +
+  geom_histogram(bins = 100) +
+  labs(title = "Simulated Aggregate Loss Distribution - Cargo (Short-Term)",
+       x = "Aggregate Cost",
+       y = "Count")
+
+ggplot(agg_long_df, aes(x = aggregate_cost)) +
+  geom_histogram(bins = 100) +
+  labs(title = "Simulated Aggregate Loss Distribution - Cargo (Long-Term)",
+       x = "Aggregate Cost",
+       y = "Count")
+
+##### ================================================================================================================
+##### 10) Shipment-Level Risk Differentiation
+##### ================================================================================================================
+
+### Expected loss by route risk
+route_risk_pricing <- pricing_data %>%
+  mutate(route_risk = factor(route_risk)) %>%
+  group_by(route_risk) %>%
+  summarise(
+    mean_lambda = mean(lambda_hat),
+    mean_mu = mean(mu_hat_lognorm),
+    mean_pure_premium = mean(pure_premium_lognorm),
+    .groups = "drop"
+  )
+
+cat("\n--- Expected Loss by Route Risk ---\n")
+print(route_risk_pricing)
+
+ggplot(route_risk_pricing, aes(x = route_risk, y = mean_pure_premium)) +
+  geom_col() +
+  labs(title = "Average Pure Premium by Route Risk",
+       x = "Route Risk",
+       y = "Average Expected Loss")
+
+route_risk_tail <- pricing_data %>%
+  mutate(route_risk = factor(route_risk)) %>%
+  group_by(route_risk) %>%
+  summarise(
+    mean_pure_premium = mean(pure_premium_lognorm),
+    p95_pure_premium = quantile(pure_premium_lognorm, 0.95),
+    p99_pure_premium = quantile(pure_premium_lognorm, 0.99),
+    .groups = "drop"
+  )
+
+print(route_risk_tail)
+
+##### ================================================================================================================
+##### Additional Cargo Outputs for Report Sections
+##### ================================================================================================================
+##### ================================================================================================================
+##### 11) Product Design Support
+##### ================================================================================================================
+
+### --------------------------------
+### A. Create cargo value bands
+### --------------------------------
+make_qbin_safe <- function(x, k = 5) {
+  qs <- quantile(x, probs = seq(0, 1, length.out = k + 1), na.rm = TRUE)
+  qs <- unique(qs)
+  if (length(qs) < 3) return(rep(NA, length(x)))
+  cut(x, breaks = qs, include.lowest = TRUE, right = TRUE)
+}
+
+pricing_data <- pricing_data %>%
+  mutate(
+    cargo_value_band = make_qbin_safe(cargo_value, k = 5)
+  )
+
+### --------------------------------
+### B. Pure premium by cargo type
+### --------------------------------
+cargo_type_pricing <- pricing_data %>%
+  group_by(cargo_type) %>%
+  summarise(
+    n = n(),
+    mean_lambda = mean(lambda_hat, na.rm = TRUE),
+    mean_mu = mean(mu_hat_lognorm, na.rm = TRUE),
+    mean_pure_premium = mean(pure_premium_lognorm, na.rm = TRUE),
+    p95_pure_premium = quantile(pure_premium_lognorm, 0.95, na.rm = TRUE),
+    p99_pure_premium = quantile(pure_premium_lognorm, 0.99, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(mean_pure_premium))
+
+cat("\n--- Pure Premium by Cargo Type ---\n")
+print(cargo_type_pricing)
+
+### --------------------------------
+### C. Pure premium by cargo value band
+### --------------------------------
+cargo_value_band_pricing <- pricing_data %>%
+  filter(!is.na(cargo_value_band)) %>%
+  group_by(cargo_value_band) %>%
+  summarise(
+    n = n(),
+    mean_pure_premium = mean(pure_premium_lognorm, na.rm = TRUE),
+    p95_pure_premium = quantile(pure_premium_lognorm, 0.95, na.rm = TRUE),
+    p99_pure_premium = quantile(pure_premium_lognorm, 0.99, na.rm = TRUE),
+    mean_cargo_value = mean(cargo_value, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+cat("\n--- Pure Premium by Cargo Value Band ---\n")
+print(cargo_value_band_pricing)
+
+### --------------------------------
+### D. Route risk x cargo type heatmap table
+### --------------------------------
+route_risk_cargo_type <- pricing_data %>%
+  mutate(route_risk = factor(route_risk)) %>%
+  group_by(route_risk, cargo_type) %>%
+  summarise(
+    mean_pure_premium = mean(pure_premium_lognorm, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+cat("\n--- Mean Pure Premium by Route Risk and Cargo Type ---\n")
+print(route_risk_cargo_type)
+
+ggplot(route_risk_cargo_type, aes(x = cargo_type, y = route_risk, fill = mean_pure_premium)) +
+  geom_tile() +
+  labs(title = "Mean Pure Premium by Route Risk and Cargo Type",
+       x = "Cargo Type",
+       y = "Route Risk",
+       fill = "Expected Loss")
+
+### --------------------------------
+### E. Deductible and cap sensitivity for product design
+### --------------------------------
+# Example product design assumptions
+deductible_options <- c(0, 50000, 100000, 250000)
+limit_options <- c(Inf, 100000000, 50000000)
+
+deductible_limit_grid <- expand.grid(
+  deductible = deductible_options,
+  limit = limit_options
+)
+
+design_sensitivity <- lapply(seq_len(nrow(deductible_limit_grid)), function(i) {
+  ded <- deductible_limit_grid$deductible[i]
+  lim <- deductible_limit_grid$limit[i]
+  
+  adj_loss <- pmin(pmax(pricing_data$mu_hat_lognorm - ded, 0), lim)
+  adj_pp <- pricing_data$lambda_hat * adj_loss
+  
+  data.frame(
+    deductible = ded,
+    limit = lim,
+    mean_pure_premium = mean(adj_pp, na.rm = TRUE),
+    p95_pure_premium = quantile(adj_pp, 0.95, na.rm = TRUE),
+    p99_pure_premium = quantile(adj_pp, 0.99, na.rm = TRUE)
+  )
+}) %>%
+  bind_rows()
+
+cat("\n--- Product Design Sensitivity: Deductibles and Limits ---\n")
+print(design_sensitivity)
+
+##### ================================================================================================================
+##### 12) Scenario Testing
+##### ================================================================================================================
+
+### --------------------------------
+### Scenario builder
+### --------------------------------
+build_scenario <- function(
+    route_risk,
+    debris_density,
+    solar_radiation,
+    distance,
+    pilot_experience,
+    vessel_age,
+    cargo_type,
+    container_type,
+    exposure = 1
+) {
+  data.frame(
+    exposure = exposure,
+    route_risk = factor(route_risk, levels = levels(freq_model_data$route_risk)),
+    debris_density = debris_density,
+    solar_radiation = solar_radiation,
+    distance = distance,
+    pilot_experience = pilot_experience,
+    vessel_age = vessel_age,
+    cargo_type = factor(cargo_type, levels = levels(freq_model_data$cargo_type)),
+    container_type = factor(container_type, levels = levels(freq_model_data$container_type))
+  )
+}
+
+### --------------------------------
+### Example scenarios
+### --------------------------------
+best_case <- build_scenario(
+  route_risk = 1,
+  debris_density = 0.10,
+  solar_radiation = 0.10,
+  distance = 10,
+  pilot_experience = 25,
+  vessel_age = 5,
+  cargo_type = "supplies",
+  container_type = levels(freq_model_data$container_type)[1]
+)
+
+moderate_case <- build_scenario(
+  route_risk = 3,
+  debris_density = 0.25,
+  solar_radiation = 0.25,
+  distance = 30,
+  pilot_experience = 15,
+  vessel_age = 20,
+  cargo_type = "cobalt",
+  container_type = levels(freq_model_data$container_type)[1]
+)
+
+worst_case <- build_scenario(
+  route_risk = 5,
+  debris_density = 0.90,
+  solar_radiation = 0.90,
+  distance = 80,
+  pilot_experience = 5,
+  vessel_age = 40,
+  cargo_type = "gold",
+  container_type = levels(freq_model_data$container_type)[1]
+)
+
+solar_storm_case <- build_scenario(
+  route_risk = 5,
+  debris_density = 0.70,
+  solar_radiation = 1.00,
+  distance = 60,
+  pilot_experience = 10,
+  vessel_age = 25,
+  cargo_type = "platinum",
+  container_type = levels(freq_model_data$container_type)[1]
+)
+
+scenario_list <- list(
+  best_case = best_case,
+  moderate_case = moderate_case,
+  worst_case = worst_case,
+  solar_storm_case = solar_storm_case
+)
+
+### --------------------------------
+### Score scenarios
+### --------------------------------
+score_scenario <- function(df) {
+  lambda <- predict(freq_nb, newdata = df, type = "response")
+  log_pred <- predict(sev_lognorm, newdata = df)
+  sigma2 <- summary(sev_lognorm)$sigma^2
+  mu <- exp(log_pred + 0.5 * sigma2)
+  
+  data.frame(
+    lambda_hat = lambda,
+    mu_hat = mu,
+    pure_premium = lambda * mu
+  )
+}
+
+scenario_results <- lapply(names(scenario_list), function(nm) {
+  out <- score_scenario(scenario_list[[nm]])
+  out$scenario <- nm
+  out
+}) %>%
+  bind_rows() %>%
+  dplyr::select(scenario, lambda_hat, mu_hat, pure_premium)
+
+cat("\n--- Scenario Results ---\n")
+print(scenario_results)
+
+##### ================================================================================================================
+##### 13) Stress Testing / Correlated Risk Overlays
+##### ================================================================================================================
+
+### --------------------------------
+### Stress multipliers
+### --------------------------------
+stress_assumptions <- tibble(
+  scenario = c("base", "freq_stress", "sev_stress", "combined_stress"),
+  freq_multiplier = c(1.00, 1.30, 1.00, 1.30),
+  sev_multiplier = c(1.00, 1.00, 1.2, 1.2)
+)
+
+cat("\n--- Stress Assumptions ---\n")
+print(stress_assumptions)
+
+### --------------------------------
+### Faster aggregate simulation helper
+### --------------------------------
+simulate_aggregate_cost <- function(
+    lambda_vec,
+    mu_vec,
+    theta,
+    sigma_lognorm,
+    years = 1,
+    n_sims = 10000,
+    freq_multiplier = 1,
+    sev_multiplier = 1,
+    seed = 123
+) {
+  set.seed(seed)
+  
+  out <- numeric(n_sims)
+  
+  for (s in seq_len(n_sims)) {
+    sim_counts <- rnbinom(
+      n = length(lambda_vec),
+      mu = lambda_vec * years * freq_multiplier,
+      size = theta
+    )
+    
+    total_loss <- 0
+    
+    idx <- which(sim_counts > 0)
+    
+    if (length(idx) > 0) {
+      for (i in idx) {
+        n_i <- sim_counts[i]
+        meanlog_i <- log(mu_vec[i] * sev_multiplier) - 0.5 * sigma_lognorm^2
+        sim_sev <- rlnorm(n_i, meanlog = meanlog_i, sdlog = sigma_lognorm)
+        total_loss <- total_loss + sum(sim_sev)
+      }
+    }
+    
+    out[s] <- total_loss
+  }
+  
+  out
+}
+
+### --------------------------------
+### Run stress scenarios
+### --------------------------------
+stress_results <- lapply(seq_len(nrow(stress_assumptions)), function(i) {
+  sc <- stress_assumptions[i, ]
+  
+  sim_short <- simulate_aggregate_cost(
+    lambda_vec = pricing_data$lambda_hat,
+    mu_vec = pricing_data$mu_hat_lognorm,
+    theta = freq_nb$theta,
+    sigma_lognorm = summary(sev_lognorm)$sigma,
+    years = 1,
+    n_sims = 10000,
+    freq_multiplier = sc$freq_multiplier,
+    sev_multiplier = sc$sev_multiplier,
+    seed = 100 + i
+  )
+  
+  data.frame(
+    scenario = sc$scenario,
+    mean_cost = mean(sim_short),
+    sd_cost = sd(sim_short),
+    p95_cost = quantile(sim_short, 0.95),
+    p99_cost = quantile(sim_short, 0.99),
+    p999_cost = quantile(sim_short, 0.999)
+  )
+}) %>%
+  bind_rows()
+
+cat("\n--- Stress Test Results (Short-Term) ---\n")
+print(stress_results)
+
+##### ================================================================================================================
+##### 14) Threat Ranking Table
+##### ================================================================================================================
+
+### --------------------------------
+### Build a simple ranked threat table
+### --------------------------------
+threat_table <- tibble(
+  threat = c(
+    "High route risk",
+    "High cargo value / precious metals",
+    "High debris density",
+    "High solar radiation",
+    "Low pilot experience",
+    "Older vessel age"
+  ),
+  frequency_effect = c(
+    "High",
+    "Low/Indirect",
+    "Moderate",
+    "Moderate",
+    "Moderate",
+    "Low"
+  ),
+  severity_effect = c(
+    "High",
+    "High",
+    "Moderate",
+    "Moderate",
+    "Low",
+    "Low"
+  ),
+  tail_risk_effect = c(
+    "High",
+    "High",
+    "Moderate",
+    "Moderate",
+    "Low",
+    "Low"
+  ),
+  overall_rank = c(1, 2, 3, 4, 5, 6)
+)
+
+cat("\n--- Threat Ranking Table ---\n")
+print(threat_table)
+
+##### ================================================================================================================
+##### 15) Additional Risk Profiling Tables
+##### ================================================================================================================
+
+### --------------------------------
+### A. Route risk already done
+### --------------------------------
+route_risk_tail <- pricing_data %>%
+  mutate(route_risk = factor(route_risk)) %>%
+  group_by(route_risk) %>%
+  summarise(
+    mean_pure_premium = mean(pure_premium_lognorm, na.rm = TRUE),
+    p95_pure_premium = quantile(pure_premium_lognorm, 0.95, na.rm = TRUE),
+    p99_pure_premium = quantile(pure_premium_lognorm, 0.99, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+cat("\n--- Route Risk Tail Profile ---\n")
+print(route_risk_tail)
+
+### --------------------------------
+### B. Cargo type risk profile
+### --------------------------------
+cargo_type_tail <- pricing_data %>%
+  group_by(cargo_type) %>%
+  summarise(
+    mean_pure_premium = mean(pure_premium_lognorm, na.rm = TRUE),
+    p95_pure_premium = quantile(pure_premium_lognorm, 0.95, na.rm = TRUE),
+    p99_pure_premium = quantile(pure_premium_lognorm, 0.99, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(mean_pure_premium))
+
+cat("\n--- Cargo Type Tail Profile ---\n")
+print(cargo_type_tail)
+
+##### ================================================================================================================
+##### 16) Assumptions Summary Table
+##### ================================================================================================================
+
+assumptions_table <- tibble(
+  assumption = c(
+    "Frequency distribution",
+    "Severity distribution",
+    "Expected loss formula",
+    "Short-term horizon",
+    "Long-term horizon",
+    "Expense loading",
+    "Risk loading",
+    "Profit loading",
+    "Premium formula",
+    "Loss ratio filter",
+    "Simulation count",
+    "Stress scenarios"
+  ),
+  value = c(
+    "Negative Binomial",
+    "Lognormal",
+    "E[L|x] = E[N|x] x E[X|x]",
+    "1 year",
+    "5 years",
+    "10%",
+    "15%",
+    "5%",
+    "Premium = E[Loss] x (1+expense) x (1+risk) x (1+profit)",
+    "Remove rows where total claim amount > 2 x cargo value",
+    "50,000 main simulations; 10,000 stress simulations",
+    "Frequency and/or severity scaled under stress"
+  ),
+  rationale = c(
+    "Poisson showed overdispersion",
+    "AIC strongly favoured lognormal over gamma",
+    "Standard actuarial frequency-severity framework",
+    "Represents near-term operating year",
+    "Illustrative longer-horizon scaling assumption",
+    "Covers operating expenses",
+    "Reflects capital/risk buffer",
+    "Represents target profit margin",
+    "Multiplicative loadings more realistic than simple additive approach",
+    "Extreme ratios likely reflect data errors",
+    "Improves stability of tail estimates",
+    "Allows assessment of correlated or adverse operating conditions"
+  )
+)
+
+cat("\n--- Assumptions Table ---\n")
+print(assumptions_table)
+
+##### ================================================================================================================
+##### 17) Data Limitations Summary Table
+##### ================================================================================================================
+
+data_limitations <- tibble(
+  limitation = c(
+    "Historical cargo dataset does not identify solar system",
+    "Long-term projections use simple time scaling",
+    "Correlated risks are approximated through stress overlays",
+    "Rows were removed during cleaning and consistency checks",
+    "Product design sensitivity uses illustrative deductibles and limits"
+  ),
+  implication = c(
+    "Solar-system-specific pricing cannot be directly estimated from historical cargo claims alone",
+    "Long-term results are indicative rather than fully dynamic forecasts",
+    "Tail dependence may be understated or overstated relative to a full dependence model",
+    "Results depend on cleaned dataset and retained observations",
+    "Design outputs are directional and should be refined with business input"
+  )
+)
+
+cat("\n--- Data Limitations Table ---\n")
+print(data_limitations)
+
+##### ================================================================================================================
+##### 18) ERM / Monitoring Dashboard
+##### ================================================================================================================
+
+erm_dashboard <- tibble(
+  metric = c(
+    "Average pure premium",
+    "99th percentile pure premium",
+    "Short-term mean aggregate cost",
+    "Short-term 99th percentile aggregate cost",
+    "Long-term mean aggregate cost",
+    "Long-term 99.9th percentile aggregate cost",
+    "Top 1% share of short-term aggregate costs",
+    "Top 1% share of long-term aggregate costs"
+  ),
+  value = c(
+    mean(pricing_data$pure_premium_lognorm, na.rm = TRUE),
+    quantile(pricing_data$pure_premium_lognorm, 0.99, na.rm = TRUE),
+    mean(aggregate_costs_short, na.rm = TRUE),
+    quantile(aggregate_costs_short, 0.99, na.rm = TRUE),
+    mean(aggregate_costs_long, na.rm = TRUE),
+    quantile(aggregate_costs_long, 0.999, na.rm = TRUE),
+    100 * sum(aggregate_costs_short[aggregate_costs_short >= quantile(aggregate_costs_short, 0.99)]) / sum(aggregate_costs_short),
+    100 * sum(aggregate_costs_long[aggregate_costs_long >= quantile(aggregate_costs_long, 0.99)]) / sum(aggregate_costs_long)
+  )
+)
+
+cat("\n--- ERM Dashboard ---\n")
+print(erm_dashboard)
