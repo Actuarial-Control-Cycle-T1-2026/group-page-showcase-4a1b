@@ -30,6 +30,35 @@ library(MASS)
 library(dplyr)
 ```
 
+## Data Cleaning Methodology
+The raw historical datasets contained various formatting inconsistencies, such as appended junk characters. To establish a reliable foundation for our GLM, a strict filer was applied on the provided Data Dictionary.
+
+The cleaning process involved:
+- Stripping junk characters from variable using 
+```r 
+sub("_.*", "", policy_id).
+```
+- Restricting numerical and index data (e.g. base_salary, gravity_level, psych_stress_index).
+
+- Aligning the dataset by mathematically verifying that the number of claims in the severity dataset matched the claim_count listed in the frequency dataset for each entity_id.
+```r
+sev_actual_counts <- sev_clean %>%
+  group_by(entity_id) %>%
+  summarise(actual_sev_claims = n(), .groups = 'drop')
+
+freq_clean <- freq_clean %>%
+  left_join(sev_actual_counts, by = "entity_id") %>%
+  mutate(actual_sev_claims = replace_na(actual_sev_claims, 0)) %>%
+  filter(claim_count == actual_sev_claims) %>%
+  dplyr::select(-actual_sev_claims)
+
+sev_clean <- sev_clean %>%
+  filter(entity_id %in% freq_clean$entity_id)
+```
+
+Data Limitations
+
+
 # Product Design
 
 To address the operational risks faced by Cosmic Quarry Mining Corporation (CQMC), we propose a comprehensive suite of insurance products covering four key hazard areas:
@@ -127,3 +156,5 @@ The portfolio is expected to be profitable under normal conditions, but exposed 
 Ongoing monitoring of claims experience, loss ratios, and exposure growth is critical to refine pricing and maintain alignment with CQMC’s evolving risk profile.
 
 Overall, the proposed design provides a balanced solution that supports operational resilience while maintaining long-term profitability.
+
+# Reference
