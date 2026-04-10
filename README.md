@@ -2,7 +2,7 @@
 ## View Full Report: [Final Report](https://drive.google.com/file/d/1IkmMsvpDR3kf036biBFHVD51ec5esZVQ/view?usp=sharing)
 
 ---
-By: Shiyu Tu, Kevin Yu, Alex Lee, Aiken Kwan, Lalith Lakkaraju
+_By: Shiyu Tu, Kevin Yu, Alex Lee, Aiken Kwan, Lalith Lakkaraju_
 ---
 The following sections outline our actuarial methodology for assessing risk and calculating premiums, while directing you to the relevant codebases and statistical models used to generate our report's findings.
 
