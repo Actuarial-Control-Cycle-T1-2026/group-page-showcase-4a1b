@@ -239,11 +239,36 @@ $S = \sum_{i=1}^{N} X_i$
 
 where N represents the number of claims and $X_i$ represents individual claim severities. This approach is widely used in actuarial science to model total portfolio losses.
 
+To capture portfolio-level uncertainty and tail risk, a Monte Carlo simulation with 100,000 iterations was conducted. In each simulation:
+1. Claim frequency is sampled from the fitted frequency distribution
+2. Individual claim severities are sampled
+3. Aggregate losses are computed
 
+This process generates a full distribution of possible outcomes, allowing estimation of key risk metrics such as Value-at-Risk (VaR) and Tail Value-at_Risk (TVaR). Monte Carlo methods are particularly useful in actuarial modelling where analytical solutions for aggregate losses are not tractable.
+
+Finally, premiums were derived using a risk-loaded pricing structure, where expected losses were adjusted for:
+- Expense loading (10%)
+- Risk margin (15%)
+- Profit margin (5%)
+
+This ensures that pricing remains commercially viable while adequately compensating for uncertainty and extreme loss exposure.
 
 ---
 
 # Financial Results
+The financial performance of the proposed insurance portfolio was evaluated using both expected value analysis and stochastic simulation, ensuring that profitability and risk exposure are assessed under realistic operating conditions.
+
+Across all four hazard categories, the portfolio demonstrates strong expected profitability, driven by appropriate pricing margins and diversified exposure. However, results also highlight the presence of significant tail risk, particularly in high-severity lines such as cargo loss and equipment failure.
+
+For equipment failure, the portfolio generates an expected annual loss of approximately $658 million with a projected net profit of $205 million. While losses are generally concentrated around the mean, extreme scenarios remain material, with a 99% Value-at-Risk exceeding $1 billion. This indicates that while the portfolio is profitable under normal conditions, it is exposed to substantial tail risk without additioanl risk mitigation strategies.
+
+Cargo loss represents the largest contributor to portfolio value, with expected premiums of $485.8 billion against expected costs of $365.9 billion, resulting in strong underwriting margins, However, the distribution is heavily skewed due to rare but catastrophic losses involving high-value shipment. Sensitivity analysis shows that policy limits are significantly more effective than deductibles in reducing tail risk exposure.
+
+Worker's compensation produces stable and highly profitable outcomes, with expected claims significantly below premium income. The relatively predictable frequency structure results in a manageable risk profile, with the 99th percentile loss remaining well within available capital. Over longer horizons, the portfolio benefits from diversification effects, reducing relative volatility.
+
+Business interruption insurance also demonstrates strong profitability, with expected margins exceeding 20%. Due to the implementation of policy limits, extreme losses are effectively capped, resulting in a tightly bounded loss distribution. Over a five-year horizon, the portfolio becomes increasingly stable due to the Law of Large Numbers, with reduced relative variability in outcomes.
+
+Overall, the financial results indicate that the proposed insurance products are commercially viable and sustainable, provided that appropriate risk controls, particularly reinsurance for extreme events, are implemented to manage tail risk exposure.
 
 ---
 
