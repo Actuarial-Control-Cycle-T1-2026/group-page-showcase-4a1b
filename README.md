@@ -227,7 +227,7 @@ Overall, the design achieves a balance between coverage adequacy, pricing accura
 # Modelling Approach
 The actuarial modelling framework adopted in this report follows a frequency-severity approach combined with stochastic simulation, which is standard practice in insurance pricing and risk analysis. This framework enables the separation of claim occurence and magnitude allowing for more accurate modelling of low-frequecy, high-severity risks observed in CQMC's operations.
 
-To model claim frequency, Generalised Linear Models (GLMs) were applied using either a Poisson or Negative Binomial distribution, depending on the presence of overdisperion in the data. For equipemtn failure, cargo loss and business interruption, significant overdispersion was observed (Pearson residuals > 1), leading to the selection of a Negative Binomial GLM. In contrast, worker’s compensation claims exhibited stable variance (Pearson residual ≈ 1) and thus a Poisson GLM was deemed appropraite.
+To model claim frequency, Generalised Linear Models (GLMs) were applied using either a Poisson or Negative Binomial distribution, depending on the presence of overdisperion in the data. For equipment failure, cargo loss and business interruption, significant overdispersion was observed (Pearson residuals > 1), leading to the selection of a Negative Binomial GLM. In contrast, worker’s compensation claims exhibited stable variance (Pearson residual ≈ 1) and thus a Poisson GLM was deemed appropraite.
 
 Claim severity was modelled using continuous distributions reflecting the heavy right-skewed nature of losses. Specifically:
 - **Gamma distributions** were used for equipment failure, where claim sizes are bounded but moderately skewed.
