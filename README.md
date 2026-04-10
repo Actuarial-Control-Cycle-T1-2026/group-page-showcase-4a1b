@@ -38,7 +38,56 @@ The cleaning process involved:
 ```r 
 sub("_.*", "", policy_id).
 ```
-- Restricting numerical and index data (e.g. base_salary, gravity_level, psych_stress_index).
+- Restricting numerical and index data (e.g. base_salary, gravity_level, psych_stress_index). Below is a snippet of worker's compensation cleaning code.
+```r
+freq_clean <- freq_clean %>%
+  filter(
+    base_salary > 0,         
+    exposure > 0,            
+    exposure <= 1,
+    experience_yrs >= 0.2,
+    experience_yrs <= 40,
+    accident_history_flag %in% c(0, 1),
+    psych_stress_index %in% c(1, 2, 3, 4, 5),
+    hours_per_week %in% c(20, 25, 30, 35, 40),
+    supervision_level >= 0,
+    supervision_level <= 1,
+    gravity_level <= 1.50,
+    gravity_level >= 0.75,
+    safety_training_index %in% c(1, 2, 3, 4, 5),
+    protective_gear_quality %in% c(1, 2, 3, 4, 5),
+    base_salary >= 20000,
+    base_salary <= 130000,
+    claim_count >= 0,
+    claim_count <= 2
+  )
+
+freq_clean <- na.omit(freq_clean)
+
+sev_clean <- sev_clean %>%
+  filter(
+    exposure > 0,            
+    exposure <= 1,
+    claim_length >= 3,
+    claim_length <= 1000,
+    claim_amount > 0,
+    experience_yrs >= 0.2,
+    experience_yrs <= 40,
+    accident_history_flag %in% c(0, 1),
+    psych_stress_index %in% c(1, 2, 3, 4, 5),
+    hours_per_week %in% c(20, 25, 30, 35, 40),
+    supervision_level >= 0,
+    supervision_level <= 1,
+    gravity_level <= 1.50,
+    gravity_level >= 0.75,
+    safety_training_index %in% c(1, 2, 3, 4, 5),
+    protective_gear_quality %in% c(1, 2, 3, 4, 5),
+    base_salary >= 20000,
+    base_salary <= 130000,
+    claim_seq %in% c(1)
+)
+
+```
 
 - Aligning the dataset by mathematically verifying that the number of claims in the severity dataset matched the claim_count listed in the frequency dataset for each entity_id.
 ```r
@@ -56,8 +105,34 @@ sev_clean <- sev_clean %>%
   filter(entity_id %in% freq_clean$entity_id)
 ```
 
-Data Limitations
+## Data Limitations
+- To prevent biasness, our cleaning approach utilised na.omit() to drop imcomplete records. While this ensures high data accuracy, it results in a reduced sample size for modelling.
 
+- By enforcing boundary limits on variables like claim_count and claim_length it may slightly under-represent absolute worst-case tail behaviours in the raw historical data.
+
+## Exploratory Data Analysis (EDA)
+
+To understand the underlying risk distribution, we conducted extensive EDA. This allowed us to map the right-skewed severity tails using logarithmic transformations and identify key physical and human predictors.
+
+Below are snippets of R code to map these relationships: 
+```r
+sev_plot_orig <- ggplot(sev_clean, aes(x = claim_amount)) +
+  geom_histogram(bins = 40, alpha = 0.8) +
+  scale_x_continuous(labels = comma) +
+  theme_minimal() +
+  labs(title = "Distribution of Claim Amounts (Original Scale)",
+       x = "Claim Amount",
+       y = "Frequency")
+
+sev_plot_log <- ggplot(sev_clean, aes(x = claim_amount)) +
+  geom_histogram(bins = 40, alpha = 0.8) +
+  scale_x_log10(labels = comma) + 
+  theme_minimal() +
+  labs(title = "Distribution of Claim Amounts (Log10 Scale)",
+       subtitle = "Log transformation reveals a more normal-shaped distribution",
+       x = "Claim Amount (Logarithmic Scale)",
+       y = "Frequency")
+```
 
 # Product Design
 
