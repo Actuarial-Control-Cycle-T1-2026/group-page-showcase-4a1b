@@ -52,7 +52,7 @@ Each product is designed to reflect the distinct risk characteristics across the
 | **Workers’ Compensation (WC)** | Covers medical expenses, rehabilitation, and lost income from workplace injuries |
 | **Business Interruption (BI)** | Covers lost revenue and recovery costs from operational shutdowns |
 
-These products collectively provide full operational protection across CQMC’s mining lifecycle. :contentReference
+These products collectively provide full operational protection across CQMC’s mining lifecycle.
 
 ---
 
@@ -116,3 +116,14 @@ This product structure is designed to:
 - Adapt to CQMC’s expansion across multiple solar systems  
 
 Overall, the design achieves a balance between coverage adequacy, pricing accuracy, and long-term sustainability.
+
+
+# Final Recommendation
+
+We recommend implementing a comprehensive insurance suite covering Equipment Failure, Cargo Loss, Workers’ Compensation, and Business Interruption to support CQMC’s interstellar mining operations.
+
+The portfolio is expected to be profitable under normal conditions, but exposed to extreme tail risk. To ensure sustainability, pricing should reflect system-specific risks, supported by deductibles to manage frequent claims and policy limits to cap catastrophic losses. Excess-of-loss reinsurance is recommended to further mitigate extreme scenarios.
+
+Ongoing monitoring of claims experience, loss ratios, and exposure growth is critical to refine pricing and maintain alignment with CQMC’s evolving risk profile.
+
+Overall, the proposed design provides a balanced solution that supports operational resilience while maintaining long-term profitability.
