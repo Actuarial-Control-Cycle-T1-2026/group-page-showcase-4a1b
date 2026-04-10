@@ -233,8 +233,12 @@ Claim severity was modelled using continuous distributions reflecting the heavy 
 - **Gamma distributions** were used for equipment failure, where claim sizes are bounded but moderately skewed.
 - **Lognormal distribution** were used for cargo loss, worker's compensation and business interruption, as exploratory data analysis showed that log-transformed claim amounts approximate normality.
 
-The modelling approach is based on a collective risk model, where aggregate losses are defined as:
-$S = \sum_{i=1}^{N} X_i$
+The modelling approach is based on a collective risk model, where aggregate losses are defined as:  
+
+$S = \sum_{i=1}^{N} X_i$  
+
+where N represents the number of claims and $X_i$ represents individual claim severities. This approach is widely used in actuarial science to model total portfolio losses.
+
 
 
 ---
