@@ -41,7 +41,7 @@ Each product is designed to reflect the distinct risk characteristics across the
 | **Workers’ Compensation (WC)** | Covers medical expenses, rehabilitation, and lost income from workplace injuries |
 | **Business Interruption (BI)** | Covers lost revenue and recovery costs from operational shutdowns |
 
-These products collectively provide full operational protection across CQMC’s mining lifecycle. :contentReference
+These products collectively provide full operational protection across CQMC’s mining lifecycle.
 
 ---
 
