@@ -111,6 +111,9 @@ sev_clean <- sev_clean %>%
 
 - By enforcing boundary limits on variables like claim_count and claim_length it may slightly under-represent absolute worst-case tail behaviours in the raw historical data.
 
+- Forward Lookg UNcertainty: Our analysis relies on the asusmption that propsective exposure data will be a good reflection of the future. This disregards technological developments or expansion plances that may change the risk profile over time
+  
+
 ## Exploratory Data Analysis (EDA)
 
 To understand the underlying risk distribution, we conducted extensive EDA. This allowed us to map the right-skewed severity tails using logarithmic transformations and identify key physical and human predictors.
