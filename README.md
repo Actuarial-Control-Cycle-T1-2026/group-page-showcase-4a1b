@@ -273,6 +273,11 @@ Overall, the financial results indicate that the proposed insurance products are
 ---
 
 # Risk Assessment
+The risk assessment of the Cosmic Quarry Mininy Corporation requires a system specific apporach to account for diverse environmental hazards. The three primary systems; Helionis Cluster, Bayesia System and Oryn Delta, have extremely different risk profiles. While the Helinois Cluster offers the most stable conditions, its dense asteriod clusters introduce unpredictable debris movement and heighted collision risks. On the other hand, Bayesia Systems binary star configuration subjects it to greater equipment degradation. Oryn Delta presents itself as an extreme navigational density due to its low light environment and shifting gravitional gradients. 
+
+Our actuarial modelling has identified critical threats drivers that will impacts the portfolio solvency. Equipment which is greater than 10 years old, has a greater failure frequency incomparison to mid lift assets. Additionally Cargo such as gold and platnium create heavy tail loss distributions, where  rare events can cause multi billion dollar claims. The team sensitivity testing reveals that while claim dedcutibles are effect for high frequency workplace injuires, policy limit are essential for managing the extreme tail risk of cargo loss and equipment failiure. 
+
+Additionally, the correlation between events will cause greater loss. For example. systemic EMP shocks coupled with supply chain collapses will simultaneously spike claim frequency and severity acorss all systems. While the firm may be able to handle isolated frequency or severity shocks, the firm may not be able to absorb correlated shocks. Thus, adding risk margins and the use of excess of loss reinsurance is imperative. By developing and integrating appropriate risk controls, into the Enterprise Risk Management (ERM) framework, we can esnure the long term sustainability of the firm. 
 
 ---
 
