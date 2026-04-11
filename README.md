@@ -111,7 +111,7 @@ sev_clean <- sev_clean %>%
 
 - By enforcing boundary limits on variables like claim_count and claim_length it may slightly under-represent absolute worst-case tail behaviours in the raw historical data.
 
-- Forward Lookg UNcertainty: Our analysis relies on the asusmption that propsective exposure data will be a good reflection of the future. This disregards technological developments or expansion plances that may change the risk profile over time
+- Forward Looking Uncertainty: Our analysis relies on the assumption that propsective exposure data will be a good reflection of the future. This disregards technological developments or expansion plans that may change the risk profile over time.
   
 
 ## Exploratory Data Analysis (EDA)
