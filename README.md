@@ -1,30 +1,3 @@
-Yeah this is a classic GitHub Pages / Markdown rendering issue — it usually breaks when code blocks aren’t properly fenced or there are small syntax inconsistencies (you’ve got one: `sub("_.*", "", policy_id).` should NOT end with a period, and inconsistent spacing can also mess things up).
-
-Below is a **clean, GitHub-safe version** of your README. You can copy-paste this directly — all code blocks are properly fenced, syntax cleaned, and it’ll render correctly.
-
----
-
-## ✅ FIXED README (COPY BELOW)
-
-````markdown
-# Insurance Product Recommendations for Cosmic Quarry Mining Corporation
-
-## View Full Report: [Final Report](https://drive.google.com/file/d/1IkmMsvpDR3kf036biBFHVD51ec5esZVQ/view?usp=sharing)
-<sub>By: Shiyu Tu, Kevin Yu, Lalith Lakkaraju, Aiken Kwan, Alex Lee</sub>
-
----
-
-The following sections outline our actuarial methodology for assessing risk and calculating premiums, while directing you to the relevant codebases and statistical models used to generate our report's findings.
-
-Other relevant files can be found in the following directories:
-- Data Cleaning & EDA
-- Actuarial Modelling (GLMs)
-- Stochastic Simulations
-- Financials & Scenario Testing
-- Images and Tables
-
----
-
 ## Overview
 
 As consulting actuaries representing Galaxy General Insurance Company (GGIC), team 4A1B presents a comprehensive and sustainable insurance portfolio for the Cosmic Quarry Mining Corporation (CQMC).
