@@ -299,12 +299,12 @@ Overall, the proposed design provides a balanced solution that supports operatio
 
 # References
 1. Ideon Technologies. (2026). Unlock Subsurface Potential with the Ideon REVEALTM Platform. Available at: https://ideon.ai/
-2. Fleetspace.com. (2025). Fleet Space Technologies | Home Page. Available at: https://www.fleetspace.com/
+2. Fleetspace.com. (2025). Fleet Space Technologies Home Page. Available at: https://www.fleetspace.com/
 3. Kepler. (2026). Kepler Communications Inc. Available at: https://kepler.space/
-4. Deteqt | Magnetic Field-Aware Intelligence (2019). Deteqt. Deteqt. Available at: https://deteqt.tech/
+4. Deteqt Magnetic Field-Aware Intelligence (2019). Deteqt. Deteqt. Available at: https://deteqt.tech/
 5. NASA. (2022). NASA. Available at: https://www.nasa.gov/
 6. Esa.int. (2025). Space Debris. Available at: https://www.esa.int/Space_Safety/Space_Debris
-7. Noaa.gov. (2026). Homepage | NOAA / NWS Space Weather Prediction Center. Available at: https://www.swpc.noaa.gov/
-8. Nasa.gov. (2019). ARES | Orbital Debris Program Office. Available at: https://orbitaldebris.jsc.nasa.gov/
+7. Noaa.gov. (2026). Homepage NOAA / NWS Space Weather Prediction Center. Available at: https://www.swpc.noaa.gov/
+8. Nasa.gov. (2019). ARES Orbital Debris Program Office. Available at: https://orbitaldebris.jsc.nasa.gov/
 9. COSO. (2023). COSO. Available at: https://www.coso.org/
 10. for, O. (2018). ISO 31000:2018. ISO. Available at: https://www.iso.org/standard/65694.html
