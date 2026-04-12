@@ -93,6 +93,7 @@ sev_clean <- sev_clean %>%
 ```
 
 - Aligning the dataset by mathematically verifying that the number of claims in the severity dataset matched the claim_count listed in the frequency dataset for each entity_id.
+
 ```r
 sev_actual_counts <- sev_clean %>%
   group_by(entity_id) %>%
