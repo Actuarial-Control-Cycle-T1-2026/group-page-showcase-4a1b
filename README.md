@@ -1,18 +1,44 @@
-## Overview
+# Insurance Product Recommendations for Cosmic Quarry Mining Corporation
 
-As consulting actuaries representing Galaxy General Insurance Company (GGIC), team 4A1B presents a comprehensive and sustainable insurance portfolio for the Cosmic Quarry Mining Corporation (CQMC).
+## View Full Report: [Final Report](https://drive.google.com/file/d/1IkmMsvpDR3kf036biBFHVD51ec5esZVQ/view?usp=sharing)
 
-With CQMC expanding its interstellar mining operations across Helionis Cluster, the Bayesia System, and the Oryn Delta, they are exposed to unique and volatile environmental hazards.
+<sub>By: Shiyu Tu, Kevin Yu, Lalith Lakkaraju, Aiken Kwan, Alex Lee<sub>
 
-This project focuses on pricing four major operational risks:
-- Equipment Failure  
-- Cargo Loss  
-- Workers’ Compensation  
-- Business Interruption  
 
-By building predictive models and running extensive Monte Carlo simulations, our goal is to deliver constructive, data-driven recommendations. This program is tailored to account for long-term solvency and profitability for GGIC, while protecting CQMC against catastrophic tail risks.
 
 ---
+
+
+
+The following sections outline our actuarial methodology for assessing risk and calculating premiums, while directing you to the relevant codebases and statistical models used to generate our report's findings.
+
+
+
+Other relevant files can be found in the following directories:
+
+- Data Cleaning & EDA:
+
+- Actuarial Modelling (GLMs):
+
+- Stochastic Simulations:
+
+- Financials & Scenario Testing
+
+- Images and Tables:
+
+
+
+As consulting actuaries representing Galaxy General Insurance Company (GGIC), team 4A1B presents a comprehensive and sustainable insurance portfolio for the Cosmic Quarry Mining Corporation (CQMC). With CQMC expanding its interstellar mining operations across Helionis Cluster, the Bayesia System, and the Oryn Delta, they are exposed to unique and volatile environmental hazards. This project focuses on pricing four major operational risks: Equipment Failure, Cargo Loss, Worker's Compensation, and Business Interruption.
+
+
+
+By building predictive models and running extensive Monte Carlo simulations, our goal is to deliver constructive, data-driven recommendations. This program is tailored to take account for the long-term solvency and profitability for GGIC, while protecting CQMC against catastrophic tail risks.
+
+
+
+---
+
+
 
 # Data Cleaning, Data Limitations, Libraries and EDA
 
@@ -21,158 +47,252 @@ By building predictive models and running extensive Monte Carlo simulations, our
 To process the Cosmic Quarry Mining Corporation claims data, we utilised the following R libraries for data manipulation, statistical modelling, and visualisation:
 
 ```r
-library(readxl)
-library(tidyverse)
-library(ggplot2)
-library(scales)
-library(forcats)
-library(MASS)
-library(dplyr)
-````
 
----
+library(readxl)
+
+library(tidyverse)
+
+library(ggplot2)
+
+library(scales)
+
+library(forcats)
+
+library(MASS)
+
+library(dplyr)
+
+```
+
+
 
 ## Data Cleaning Methodology
 
-The raw historical datasets contained various formatting inconsistencies, such as appended junk characters. To establish a reliable foundation for our GLM, a strict filter was applied based on the provided Data Dictionary.
+The raw historical datasets contained various formatting inconsistencies, such as appended junk characters. To establish a reliable foundation for our GLM, a strict filter was applied on the provided Data Dictionary.
 
-### Key Cleaning Steps
 
-**1. Removing junk characters from IDs**
 
-```r
-sub("_.*", "", policy_id)
+The cleaning process involved:
+
+- Stripping junk characters from variable using:
+
+```r 
+
+sub("_.*", "", policy_id).
+
 ```
 
-**2. Filtering valid observations (Frequency dataset example)**
+- Restricting numerical and index data (e.g. base_salary, gravity_level, psych_stress_index). Below is a snippet of worker's compensation cleaning code.
 
 ```r
+
 freq_clean <- freq_clean %>%
+
   filter(
-    base_salary > 0,
-    exposure > 0,
+
+    base_salary > 0,         
+
+    exposure > 0,            
+
     exposure <= 1,
+
     experience_yrs >= 0.2,
+
     experience_yrs <= 40,
+
     accident_history_flag %in% c(0, 1),
+
     psych_stress_index %in% c(1, 2, 3, 4, 5),
+
     hours_per_week %in% c(20, 25, 30, 35, 40),
+
     supervision_level >= 0,
+
     supervision_level <= 1,
+
     gravity_level <= 1.50,
+
     gravity_level >= 0.75,
+
     safety_training_index %in% c(1, 2, 3, 4, 5),
+
     protective_gear_quality %in% c(1, 2, 3, 4, 5),
+
     base_salary >= 20000,
+
     base_salary <= 130000,
+
     claim_count >= 0,
+
     claim_count <= 2
+
   )
+
+
 
 freq_clean <- na.omit(freq_clean)
-```
 
-**3. Filtering valid observations (Severity dataset)**
 
-```r
+
 sev_clean <- sev_clean %>%
+
   filter(
-    exposure > 0,
+
+    exposure > 0,            
+
     exposure <= 1,
+
     claim_length >= 3,
+
     claim_length <= 1000,
+
     claim_amount > 0,
+
     experience_yrs >= 0.2,
+
     experience_yrs <= 40,
+
     accident_history_flag %in% c(0, 1),
+
     psych_stress_index %in% c(1, 2, 3, 4, 5),
+
     hours_per_week %in% c(20, 25, 30, 35, 40),
+
     supervision_level >= 0,
+
     supervision_level <= 1,
+
     gravity_level <= 1.50,
+
     gravity_level >= 0.75,
+
     safety_training_index %in% c(1, 2, 3, 4, 5),
+
     protective_gear_quality %in% c(1, 2, 3, 4, 5),
+
     base_salary >= 20000,
+
     base_salary <= 130000,
+
     claim_seq %in% c(1)
-  )
+
+)
+
 ```
 
-**4. Aligning frequency and severity datasets**
+
+
+- Aligning the dataset by mathematically verifying that the number of claims in the severity dataset matched the claim_count listed in the frequency dataset for each entity_id.
 
 ```r
+
 sev_actual_counts <- sev_clean %>%
+
   group_by(entity_id) %>%
+
   summarise(actual_sev_claims = n(), .groups = 'drop')
 
+
+
 freq_clean <- freq_clean %>%
+
   left_join(sev_actual_counts, by = "entity_id") %>%
+
   mutate(actual_sev_claims = replace_na(actual_sev_claims, 0)) %>%
+
   filter(claim_count == actual_sev_claims) %>%
+
   dplyr::select(-actual_sev_claims)
 
+
+
 sev_clean <- sev_clean %>%
+
   filter(entity_id %in% freq_clean$entity_id)
+
 ```
 
----
+
 
 ## Data Limitations
 
-* Missing data was removed using `na.omit()`, improving data quality but reducing sample size.
-* Imposed variable bounds (e.g. claim_count, claim_length) may under-represent extreme tail risks.
-* Forward-looking uncertainty: future exposure may differ due to technological or operational changes not captured in historical data.
+- To prevent bias, our cleaning approach utilised na.omit() to drop incomplete records. While this ensures high data accuracy, it results in a reduced sample size for modelling.
 
----
+
+
+- By enforcing boundary limits on variables like claim_count and claim_length it may slightly under-represent absolute worst-case tail behaviours in the raw historical data.
+
+
+
+- Forward Looking Uncertainty: Our analysis relies on the assumption that propsective exposure data will be a good reflection of the future. This disregards technological developments or expansion plans that may change the risk profile over time.
+
+  
+
+
 
 ## Exploratory Data Analysis (EDA)
 
-To understand the underlying risk distribution, we conducted extensive EDA. This allowed us to:
 
-* Identify right-skewed severity distributions
-* Apply logarithmic transformations
-* Detect key physical and human risk drivers
 
-### Distribution Visualisation
+To understand the underlying risk distribution, we conducted extensive EDA. This allowed us to map the right-skewed severity tails using logarithmic transformations and identify key physical and human predictors.
+
+
+
+Below are snippets of R code to map these relationships: 
 
 ```r
+
 sev_plot_orig <- ggplot(sev_clean, aes(x = claim_amount)) +
+
   geom_histogram(bins = 40, alpha = 0.8) +
+
   scale_x_continuous(labels = comma) +
+
   theme_minimal() +
-  labs(
-    title = "Distribution of Claim Amounts (Original Scale)",
-    x = "Claim Amount",
-    y = "Frequency"
-  )
+
+  labs(title = "Distribution of Claim Amounts (Original Scale)",
+
+       x = "Claim Amount",
+
+       y = "Frequency")
+
+
 
 sev_plot_log <- ggplot(sev_clean, aes(x = claim_amount)) +
+
   geom_histogram(bins = 40, alpha = 0.8) +
-  scale_x_log10(labels = comma) +
+
+  scale_x_log10(labels = comma) + 
+
   theme_minimal() +
-  labs(
-    title = "Distribution of Claim Amounts (Log10 Scale)",
-    subtitle = "Log transformation reveals a more normal-shaped distribution",
-    x = "Claim Amount (Logarithmic Scale)",
-    y = "Frequency"
-  )
+
+  labs(title = "Distribution of Claim Amounts (Log10 Scale)",
+
+       subtitle = "Log transformation reveals a more normal-shaped distribution",
+
+       x = "Claim Amount (Logarithmic Scale)",
+
+       y = "Frequency")
+
 ```
 
----
+
 
 # Product Design
 
+
+
 To address the operational risks faced by Cosmic Quarry Mining Corporation (CQMC), we propose a comprehensive suite of insurance products covering four key hazard areas:
 
-* Equipment Failure
-* Cargo Loss
-* Workers’ Compensation
-* Business Interruption
 
-Each product is designed to reflect the distinct risk characteristics across the Helionis Cluster, Bayesia System, and Oryn Delta, ensuring that pricing and coverage appropriately capture environmental differences.
 
----
+- Equipment Failure  
+
+- Cargo Loss  
+
+- Workers’ Compensation  
+
+- Business Interruption  
 
 ## Coverage Structure
 
